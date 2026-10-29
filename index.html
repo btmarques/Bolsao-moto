@@ -53,6 +53,7 @@ header{background:linear-gradient(180deg,var(--sign),var(--sign-2));color:var(--
 /* mapa */
 #map{flex:1 1 auto;min-height:200px;background:var(--chip);z-index:1}
 .leaflet-container{font-family:var(--font)}
+@media (prefers-color-scheme:dark){.leaflet-tile-pane{filter:invert(1) hue-rotate(180deg) brightness(.9) contrast(.9)}}
 .dest-pin{width:30px;height:40px}
 .me-dot{width:18px;height:18px;border-radius:50%;background:#1a73e8;border:3px solid #fff;box-shadow:0 0 0 6px rgba(26,115,232,.25)}
 .bmk{display:grid;place-items:center;border-radius:50%;background:var(--mark);color:var(--mark-fg);font-weight:800;font-size:12px;border:2px solid #1b1600;box-shadow:0 1px 4px rgba(0,0,0,.35)}
@@ -138,10 +139,8 @@ const walkMin=m=>Math.max(1,Math.round(m*1.3/80)); // fator de trajeto real ≈1
 
 // ---------- mapa ----------
 const dark=matchMedia('(prefers-color-scheme: dark)');
-const tileUrl=()=>dark.matches?'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png':'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png';
 const map=L.map('map',{zoomControl:false,attributionControl:true}).setView([-23.5505,-46.6333],13);
-let tiles=L.tileLayer(tileUrl(),{maxZoom:19,subdomains:'abcd',attribution:'© OpenStreetMap © CARTO'}).addTo(map);
-dark.addEventListener('change',()=>{map.removeLayer(tiles);tiles=L.tileLayer(tileUrl(),{maxZoom:19,subdomains:'abcd',attribution:'© OpenStreetMap © CARTO'}).addTo(map)});
+L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'© OpenStreetMap'}).addTo(map);
 const layer=L.layerGroup().addTo(map);
 const allLayer=L.layerGroup();
 const destIcon=L.divIcon({className:'',html:'<svg class="dest-pin" viewBox="0 0 30 40"><path d="M15 39C15 39 2 23 2 14a13 13 0 0 1 26 0c0 9-13 25-13 25z" fill="#d0142c" stroke="#fff" stroke-width="2"/><circle cx="15" cy="14" r="5" fill="#fff"/></svg>',iconSize:[30,40],iconAnchor:[15,39]});
