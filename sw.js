@@ -1,5 +1,5 @@
 // Bolsão Moto: guarda o app e os dados para abrir rápido e funcionar com sinal fraco.
-const CACHE='bolsao-moto-v4';
+const CACHE='bolsao-moto-v5';
 const CORE=['./','index.html','bolsoes.json','manifest.webmanifest','icon-180.png','icon-192.png','icon-512.png',
   'https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css',
   'https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js'];
