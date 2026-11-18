@@ -111,6 +111,9 @@ header{background:var(--hdr);color:var(--sign-fg);padding-top:calc(env(safe-area
 .go{display:flex;align-items:center;justify-content:center;gap:10px;width:100%;border:0;border-radius:16px;background:var(--ok);color:#fff;font-size:20px;font-weight:800;padding:17px;box-shadow:0 4px 14px rgba(23,138,69,.35)}
 .go:active{transform:scale(.985)}
 .alts{margin-top:16px;display:grid;gap:8px}
+.trip{border:1.5px solid var(--ok);border-radius:16px;padding:12px 12px 8px;margin:0 0 14px;background:color-mix(in srgb,var(--ok) 9%,transparent)}
+.trip .tt{font-size:19px;font-weight:800;margin:2px 0 10px}.trip .go{margin:0 0 8px;font-size:18px;padding:14px}.trip .ts{font-size:14px;opacity:.75;margin:0 0 4px}
+.trow{display:flex;justify-content:space-between;gap:8px}.tlink{background:none;border:0;color:var(--ok);font-weight:700;font-size:15px;padding:6px 2px}
 .alt{display:grid;grid-template-columns:1fr auto;gap:2px 10px;align-items:center;padding:10px 12px;border:1px solid var(--line);border-radius:12px;background:none;text-align:left;width:100%}
 .alt .t{font-weight:650;overflow-wrap:anywhere}
 .alt .s{grid-column:1;color:var(--muted);font-size:14px;font-variant-numeric:tabular-nums}
@@ -158,7 +161,7 @@ button:focus-visible{outline:3px solid var(--mark);outline-offset:2px}
 <script>
 (function(){
 'use strict';
-const APP_VERSION='18/11 · 01h10';
+const APP_VERSION='18/11 · 11h00';
 const $=id=>document.getElementById(id);
 const norm=s=>(s||'').normalize('NFD').replace(/[̀-ͯ]/g,'').toLowerCase();
 const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
@@ -249,7 +252,7 @@ function recentChips(){
 const starSvg='<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2.5l2.9 6.1 6.6.8-4.9 4.6 1.3 6.6L12 17.3l-5.9 3.3 1.3-6.6L2.5 9.4l6.6-.8z"/></svg>';
 function showHome(){
   const nf=store.get('favoritos',[]).length;
-  panel.innerHTML=`<div id="homec"><div class="empty"><h2>Para onde você vai?</h2>
+  panel.innerHTML=`<div id="homec">${tripCard()}<div class="empty"><h2>Para onde você vai?</h2>
   <p>Digite o destino acima ou toque em <b>Perto de mim</b>.</p></div>
   <div class="rowhd"><p class="lbl">Recentes</p><button class="favbtn" id="favBtn">${starSvg}Favoritos${nf?` <small>${nf}</small>`:''}</button></div>
   ${recentChips()}
@@ -294,7 +297,12 @@ panel.addEventListener('click',e=>{
   const a=e.target.closest('[data-alt]');if(a){picked=+a.dataset.alt;render();return}
   const ob=e.target.closest('[data-ord]');if(ob){pathInfo=null;routeOrd=ob.dataset.ord;store.set('rotaOrdem',routeOrd);render(true);return}
   const rb=e.target.closest('[data-rn]');if(rb){pathInfo=null;routeN=+rb.dataset.rn;store.set('rotaN',routeN);render(true);return}
-  if(e.target.closest('#goBtn')){const st=routeStops();if(st.length>1)goRoute(st);else go(st[0]);return}
+  if(e.target.closest('#goBtn')){const st=routeStops();if(!dest.me)startTrip(st);if(st.length>1)goRoute(st);else go(st[0]);setTimeout(refreshPanel,800);return}
+  const pk=e.target.closest('[data-park]');if(pk){const t=trip();if(!t)return;t.fase='ape';t.parked=+pk.dataset.park;store.set('viagem',t);const s=t.stops[t.parked];walkTo(s,dAddr(t.dest),t.dest.lat+','+t.dest.lng);setTimeout(refreshPanel,800);return}
+  const tp=e.target.closest('[data-trip]');if(tp){const t=trip();if(!t)return;const s=t.stops[t.parked]||t.stops[0];
+    if(tp.dataset.trip==='fim'){store.set('viagem',null);refreshPanel();return}
+    if(tp.dataset.trip==='volta'){walkTo(null,s.lat+','+s.lng,s.lat+','+s.lng);return}
+    if(tp.dataset.trip==='ape'){walkTo(null,dAddr(t.dest),t.dest.lat+','+t.dest.lng);return}}
 });
 
 function setDest(d,save=true){
@@ -366,7 +374,7 @@ function render(fit){
   if(fit)map.easeTo({center:[(d.lng+walkFrom.lng)/2,(d.lat+walkFrom.lat)/2],zoom:16,offset:[0,mobile()?-Math.min(sheet.offsetHeight,$('map').offsetHeight*.6)/2:0],duration:600});
   const near=c.m<=400, far=c.m>900;
   const where=d.me?'Você está aqui':`Destino: <b>${esc(d.label)}</b>${d.sub?' · '+esc(d.sub):''}`;
-  panel.innerHTML=`
+  panel.innerHTML=`${tripCard()}
   <p class="dest">${where}</p>
   <p class="lbl">${picked===0?'Bolsão mais perto':'Bolsão escolhido'}</p>
   <div class="top"><h2>${esc(b.rua)}</h2><div class="sub">${esc([b.comp,b.area].filter(Boolean).join(' · '))}</div>
@@ -393,18 +401,18 @@ function render(fit){
 
 // ---------- abrir no Google Maps ----------
 function go(b){
-  const ll=b.lat+','+b.lng;
+  const ll=b.lat+','+b.lng, ga=encodeURIComponent(gAddr(b));
   if(navApp==='waze'){const wweb='https://waze.com/ul?ll='+ll+'&navigate=yes';
     if(/iPhone|iPad|iPod/.test(navigator.userAgent)||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1)){let gone=false;document.addEventListener('visibilitychange',()=>{gone=true},{once:true});
       location.href='waze://?ll='+ll+'&navigate=yes';setTimeout(()=>{if(!gone&&!document.hidden)location.href=wweb},1400)}
     else location.href=wweb;
     return}
-  const web='https://www.google.com/maps/dir/?api=1&destination='+ll+'&travelmode=two-wheeler&dir_action=navigate';
-  const app='comgooglemaps://?daddr='+ll+'&directionsmode=two-wheeler&nav=1';
+  const web='https://www.google.com/maps/dir/?api=1&destination='+ga+'&travelmode=two-wheeler&dir_action=navigate';
+  const app='comgooglemaps://?daddr='+ga+'&directionsmode=two-wheeler&nav=1';
   const isIOS=/iPhone|iPad|iPod/.test(navigator.userAgent)||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1);
   const isAndroid=/Android/i.test(navigator.userAgent);
   if(isAndroid){let gone=false;document.addEventListener('visibilitychange',()=>{gone=true},{once:true});
-    location.href='intent://navigation?q='+ll+'&mode=l#Intent;scheme=google.navigation;package=com.google.android.apps.maps;S.browser_fallback_url='+encodeURIComponent(web)+';end';
+    location.href='intent://navigation?q='+ga+'&mode=l#Intent;scheme=google.navigation;package=com.google.android.apps.maps;S.browser_fallback_url='+encodeURIComponent(web)+';end';
     setTimeout(()=>{if(!gone&&!document.hidden)location.href=web},1600);return}
   if(!isIOS){location.href=web;return}
   let left=false;const onHide=()=>{left=true};
@@ -414,17 +422,45 @@ function go(b){
 }
 
 // várias paradas: só o Google Maps aceita; o link universal abre o app se estiver instalado
+// endereço por escrito ("R. Viradouro, 63, São Paulo - SP") para o Google mostrar a parada com nome; sem número, usa a coordenada
+function gAddr(s){const m=/^(.*?)[ ,]+(\d+)\s*$/.exec(s.rua||'');return m?m[1]+', '+m[2]+', São Paulo - SP':s.lat+','+s.lng}
 function goRoute(stops){
-  const ll=s=>s.lat+','+s.lng, last=stops[stops.length-1];
+  const ll=gAddr, last=stops[stops.length-1];
   const web='https://www.google.com/maps/dir/?api=1&destination='+ll(last)+'&waypoints='+encodeURIComponent(stops.slice(0,-1).map(ll).join('|'))+'&travelmode=two-wheeler&dir_action=navigate';
   // no iPhone, abre direto o app do Google Maps com as paradas (formato "A+to:B+to:C"); o site fica de reserva
-  const app='comgooglemaps://?daddr='+stops.map(ll).join('+to:')+'&directionsmode=two-wheeler&nav=1';
+  const app='comgooglemaps://?daddr='+stops.map(s=>encodeURIComponent(ll(s))).join('+to:')+'&directionsmode=two-wheeler&nav=1';
   const isIOS=/iPhone|iPad|iPod/.test(navigator.userAgent)||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1);
   if(!isIOS){location.href=web;return}
   let left=false;document.addEventListener('visibilitychange',()=>{left=true},{once:true});
   location.href=app;
   setTimeout(()=>{if(!left&&!document.hidden)location.href=web},1400);
 }
+
+// ---------- a pé: do bolsão ao destino e de volta para a moto ----------
+function dAddr(d){return d.label?[d.label,(d.sub||'').split(' · ').filter(Boolean).join(', ')].filter(Boolean).join(', '):d.lat+','+d.lng}
+function walkTo(from,toTxt,toLL){
+  const web='https://www.google.com/maps/dir/?api=1'+(from?'&origin='+from.lat+','+from.lng:'')+'&destination='+encodeURIComponent(toTxt)+'&travelmode=walking&dir_action=navigate';
+  const isIOS=/iPhone|iPad|iPod/.test(navigator.userAgent)||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1), isAndroid=/Android/i.test(navigator.userAgent);
+  let left=false;document.addEventListener('visibilitychange',()=>{left=true},{once:true});
+  if(isAndroid){location.href='intent://navigation?q='+toLL+'&mode=w#Intent;scheme=google.navigation;package=com.google.android.apps.maps;S.browser_fallback_url='+encodeURIComponent(web)+';end';setTimeout(()=>{if(!left&&!document.hidden)location.href=web},1600);return}
+  if(!isIOS){location.href=web;return}
+  location.href='comgooglemaps://?'+(from?'saddr='+from.lat+','+from.lng+'&':'')+'daddr='+encodeURIComponent(toTxt)+'&directionsmode=walking&nav=1';
+  setTimeout(()=>{if(!left&&!document.hidden)location.href=web},1400)}
+const TRIP_H=12*3600e3;
+function trip(){const t=store.get('viagem',null);return t&&Date.now()-t.ts<TRIP_H?t:null}
+function tripCard(){const t=trip();if(!t)return'';const d=t.dest,ds=esc(d.label||'destino');
+  if(t.fase==='moto')return `<div class="trip"><p class="lbl" style="margin:0">Viagem em andamento</p>
+    <p class="tt">Chegou e estacionou?</p>
+    ${t.stops.length>1?t.stops.map((s,i)=>`<button class="go walkb" data-park="${i}">${footSvg}Estacionei no ${i+1} · ${esc(s.rua)}</button>`).join(''):`<button class="go walkb" data-park="0">${footSvg}Estacionei — ir a pé</button>`}
+    <p class="ts">O Google Maps abre no modo a pé até <b>${ds}</b>.</p>
+    <button class="tlink" data-trip="fim">Cancelar viagem</button></div>`;
+  const s=t.stops[t.parked]||t.stops[0];
+  return `<div class="trip"><p class="lbl" style="margin:0">Sua moto está em</p><p class="tt">${esc(s.rua)}</p>
+    <button class="go walkb" data-trip="volta">${footSvg}Voltar para a moto</button>
+    <div class="trow"><button class="tlink" data-trip="ape">Ir a pé até ${ds}</button><button class="tlink" data-trip="fim">Encerrar</button></div></div>`}
+const footSvg='<svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="13" cy="4" r="2"/><path d="M13.5 7.5 10 9.3V13h2v-2.4l1.2-.6-1.7 8.5 1.9.4 1.1-5 2 2V21h2v-5.9l-2.1-2.1.6-3A6 6 0 0 0 20 12v-2a4 4 0 0 1-3-1.9l-1-1.6a2 2 0 0 0-2.5-.8z"/></svg>';
+function startTrip(stops){store.set('viagem',{ts:Date.now(),fase:'moto',parked:0,dest:{lat:dest.lat,lng:dest.lng,label:dest.label||'',sub:dest.sub||''},stops:stops.map(s=>({lat:s.lat,lng:s.lng,rua:s.rua}))})}
+function refreshPanel(){if(dest&&current.length)render();else showHome()}
 
 // ---------- busca de endereço (Photon / OpenStreetMap) ----------
 const q=$('q'),sugg=$('sugg');let tmr=0,ctrl=null;
@@ -532,6 +568,7 @@ function GAP(){const sa=matchMedia('(display-mode: standalone)').matches||naviga
   return g>0&&g<140?g:0}
 function fullH(){const pr=document.getElementById('probe');return (pr?pr.getBoundingClientRect().bottom:innerHeight)+GAP()}
 function setHd(){document.documentElement.style.setProperty('--gap',GAP()+'px');document.documentElement.style.setProperty('--hd',document.querySelector('header').offsetHeight+'px');map.resize()}
+document.addEventListener('visibilitychange',()=>{if(!document.hidden&&trip())refreshPanel()});
 addEventListener('resize',()=>{setHd();setSheet(sheetState)});setHd();setTimeout(()=>{setHd();setSheet(sheetState)},600);
 setSheet('mid');
 
