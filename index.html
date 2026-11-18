@@ -368,7 +368,14 @@ function go(b){
 // várias paradas: só o Google Maps aceita; o link universal abre o app se estiver instalado
 function goRoute(stops){
   const ll=s=>s.lat+','+s.lng, last=stops[stops.length-1];
-  location.href='https://www.google.com/maps/dir/?api=1&destination='+ll(last)+'&waypoints='+encodeURIComponent(stops.slice(0,-1).map(ll).join('|'))+'&travelmode=driving&dir_action=navigate';
+  const web='https://www.google.com/maps/dir/?api=1&destination='+ll(last)+'&waypoints='+encodeURIComponent(stops.slice(0,-1).map(ll).join('|'))+'&travelmode=driving&dir_action=navigate';
+  // no iPhone, abre direto o app do Google Maps com as paradas (formato "A+to:B+to:C"); o site fica de reserva
+  const app='comgooglemaps://?daddr='+stops.map(ll).join('+to:')+'&directionsmode=driving';
+  const isIOS=/iPhone|iPad|iPod/.test(navigator.userAgent)||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1);
+  if(!isIOS){location.href=web;return}
+  let left=false;document.addEventListener('visibilitychange',()=>{left=true},{once:true});
+  location.href=app;
+  setTimeout(()=>{if(!left&&!document.hidden)location.href=web},1400);
 }
 
 // ---------- busca de endereço (Photon / OpenStreetMap) ----------
