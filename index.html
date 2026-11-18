@@ -80,6 +80,9 @@ header{background:var(--hdr);color:var(--sign-fg);padding-top:calc(env(safe-area
 .seg.rn{margin-bottom:12px}
 .bmk.best{background:var(--ok);color:#fff;border-color:#fff;font-size:14px;box-shadow:0 0 0 4px rgba(23,138,69,.35),0 2px 6px rgba(0,0,0,.4)}
 
+#loc{position:absolute;right:max(14px,env(safe-area-inset-right));bottom:calc(var(--sh,46vh) + 14px);z-index:800;width:46px;height:46px;border-radius:50%;border:0;background:var(--surface);color:#1a73e8;box-shadow:0 2px 10px rgba(0,0,0,.25);display:grid;place-items:center;transition:bottom .25s ease}
+#loc.on{background:#1a73e8;color:#fff}
+@media (min-width:760px){#loc{bottom:24px}}
 /* painel */
 #sheet{position:absolute;left:0;right:0;bottom:0;background:var(--surface);border-top-left-radius:20px;border-top-right-radius:20px;box-shadow:0 -6px 24px rgba(0,0,0,.18);z-index:900;padding-bottom:env(safe-area-inset-bottom);height:46vh;display:flex;flex-direction:column;transition:height .25s ease}
 #sheet.dragging{transition:none}
@@ -139,6 +142,7 @@ button:focus-visible{outline:3px solid var(--mark);outline-offset:2px}
 </header>
 
 <div id="map" aria-label="Mapa"></div>
+<button id="loc" aria-label="Mostrar minha localização"><svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M21 3 3 10.5l7 2.5 2.5 7z"/></svg></button>
 
 <section id="sheet" class="pad" aria-live="polite">
   <div class="grabzone" id="grab" role="button" tabindex="0" aria-label="Expandir ou recolher o painel"><div class="grab"></div></div>
@@ -176,7 +180,7 @@ const map=new maplibregl.Map({container:'map',style:styleUrl(),center:[-46.6333,
 map.touchZoomRotate.disableRotation();
 // marcadores do resultado (elementos HTML, sobrevivem à troca de estilo)
 let markers=[];
-const layer={clearLayers(){markers.forEach(m=>m.remove());markers=[];setLine(null)}};
+const layer={clearLayers(){markers.forEach(m=>m.remove());markers=[];setLine(null);setRoute(null)}};
 function addMarker(lng,lat,html,anchor,z,onClick){const el=document.createElement('div');el.className='mk';el.innerHTML=html;el.style.zIndex=z||0;
   if(onClick)el.addEventListener('click',e=>{e.stopPropagation();onClick()});
   const m=new maplibregl.Marker({element:el,anchor:anchor||'center'}).setLngLat([lng,lat]).addTo(map);markers.push(m);return m}
@@ -184,14 +188,18 @@ const destHtml='<svg class="dest-pin" viewBox="0 0 30 40"><path d="M15 39C15 39 
 const meHtml='<div class="me-dot"></div>';
 const bHtml=(n,best,ord)=>{const s=best?40:ord?32:Math.min(30,18+Math.round(n/5));return `<div class="bmk${best?' best':ord?' rt':''}" style="width:${s}px;height:${s}px">${n}${ord?`<i class="ord">${ord}</i>`:''}</div>`};
 // camadas de dados no mapa (refeitas sempre que o estilo carrega)
-let lineData=null, allData={type:'FeatureCollection',features:[]}, allVisible=true;
+let lineData=null, routeData=null, allData={type:'FeatureCollection',features:[]}, allVisible=true;
 const empty={type:'FeatureCollection',features:[]};
+function setRoute(coords){routeData=coords&&coords.length>1?{type:'Feature',geometry:{type:'LineString',coordinates:coords}}:null;const s=map.getSource('rota');if(s)s.setData(routeData||empty)}
 function setLine(coords){lineData=coords?{type:'Feature',geometry:{type:'LineString',coordinates:coords}}:null;const s=map.getSource('linha');if(s)s.setData(lineData||empty)}
 function setAllVisible(v){allVisible=v;if(map.getLayer('todos'))map.setLayoutProperty('todos','visibility',v?'visible':'none')}
 function addDataLayers(){
   if(!map.getSource('todos'))map.addSource('todos',{type:'geojson',data:allData});
   if(!map.getLayer('todos'))map.addLayer({id:'todos',type:'circle',source:'todos',minzoom:13,layout:{visibility:allVisible?'visible':'none'},
     paint:{'circle-radius':['interpolate',['linear'],['zoom'],13,3,17,7],'circle-color':'#f2b705','circle-stroke-color':'#1b1600','circle-stroke-width':1}});
+  if(!map.getSource('rota'))map.addSource('rota',{type:'geojson',data:routeData||empty});
+  if(!map.getLayer('rota-borda'))map.addLayer({id:'rota-borda',type:'line',source:'rota',layout:{'line-cap':'round','line-join':'round'},paint:{'line-color':'#ffffff','line-width':8,'line-opacity':.9}});
+  if(!map.getLayer('rota'))map.addLayer({id:'rota',type:'line',source:'rota',layout:{'line-cap':'round','line-join':'round'},paint:{'line-color':'#1a73e8','line-width':5}});
   if(!map.getSource('linha'))map.addSource('linha',{type:'geojson',data:lineData||empty});
   if(!map.getLayer('linha'))map.addLayer({id:'linha',type:'line',source:'linha',layout:{'line-cap':'round'},paint:{'line-color':'#178a45','line-width':3,'line-dasharray':[1.5,2]}});
 }
@@ -250,33 +258,67 @@ panel.addEventListener('click',e=>{
   const tb=e.target.closest('[data-tema]');if(tb){setTema(tb.dataset.tema);showSettings();return}
   if(e.target.closest('#backHome')){showHome();return}
   const a=e.target.closest('[data-alt]');if(a){picked=+a.dataset.alt;render();return}
-  const ob=e.target.closest('[data-ord]');if(ob){routeOrd=ob.dataset.ord;store.set('rotaOrdem',routeOrd);render(true);return}
-  const rb=e.target.closest('[data-rn]');if(rb){routeN=+rb.dataset.rn;store.set('rotaN',routeN);render(true);return}
+  const ob=e.target.closest('[data-ord]');if(ob){pathInfo=null;routeOrd=ob.dataset.ord;store.set('rotaOrdem',routeOrd);render(true);return}
+  const rb=e.target.closest('[data-rn]');if(rb){pathInfo=null;routeN=+rb.dataset.rn;store.set('rotaN',routeN);render(true);return}
   if(e.target.closest('#goBtn')){const st=routeStops();if(st.length>1)goRoute(st);else go(st[0]);return}
 });
 
 function setDest(d,save=true){
-  dest=d;hideMe();if(d.me)lastPos={lat:d.lat,lng:d.lng};$('q').value=d.me?'':d.label;$('clear').hidden=!$('q').value;
+  dest=d;pathInfo=null;if(d.me)lastPos={lat:d.lat,lng:d.lng};$('q').value=d.me?'':d.label;$('clear').hidden=!$('q').value;
   if(save&&!d.me){const r=store.get('recentes',[]).filter(x=>x.label!==d.label);r.unshift({lat:d.lat,lng:d.lng,label:d.label,sub:d.sub||''});store.set('recentes',r.slice(0,6))}
   setAllVisible(false);
   current=B.map(b=>({b,m:dist(d,b)})).sort((x,y)=>x.m-y.m).slice(0,6);
   picked=0;if(sheetState==='min')setSheet('mid');render(true);
 }
+// ---------- rotas pelas ruas (OSRM / OpenStreetMap: respeita mão de direção) ----------
+const routeCache=new Map();
+function osrm(points){const key=points.map(p=>p.lng.toFixed(5)+','+p.lat.toFixed(5)).join(';');
+  if(routeCache.has(key))return routeCache.get(key);
+  const pr=fetch('https://router.project-osrm.org/route/v1/driving/'+key+'?overview=full&geometries=geojson')
+    .then(r=>r.json()).then(j=>j.code==='Ok'&&j.routes[0]?{coords:j.routes[0].geometry.coordinates,dist:j.routes[0].distance,dur:j.routes[0].duration}:null)
+    .catch(()=>null);
+  routeCache.set(key,pr);pr.then(v=>{if(!v)routeCache.delete(key)});return pr}
+// distância de um ponto até a rota e quanto da rota já foi percorrido nesse ponto (metros)
+function alongRoute(coords,pt){const kx=111320*Math.cos(pt.lat*Math.PI/180),ky=110540;let best={d:1e9,s:0},acc=0;
+  for(let i=1;i<coords.length;i++){const ax=(coords[i-1][0]-pt.lng)*kx,ay=(coords[i-1][1]-pt.lat)*ky,bx=(coords[i][0]-pt.lng)*kx,by=(coords[i][1]-pt.lat)*ky;
+    const vx=bx-ax,vy=by-ay,L=Math.hypot(vx,vy)||1e-9;let t=-(ax*vx+ay*vy)/(L*L);t=Math.max(0,Math.min(1,t));
+    const d=Math.hypot(ax+vx*t,ay+vy*t);if(d<best.d)best={d,s:acc+L*t};acc+=L}
+  return {d:best.d,s:best.s,total:acc}}
+// "no meu caminho": bolsões a até 150 m da rota, no último 1,5 km antes do destino, na ordem em que você passa
+let pathInfo=null;
+function computePath(){
+  if(!dest||!lastPos)return;const d=dest,key=d.lat+','+d.lng+'|'+lastPos.lat.toFixed(4)+','+lastPos.lng.toFixed(4)+'|'+routeN;
+  if(pathInfo&&pathInfo.key===key)return;pathInfo={key,loading:true};
+  osrm([lastPos,d]).then(r=>{if(!pathInfo||pathInfo.key!==key)return;
+    if(!r){pathInfo={key,fail:true};render();return}
+    const cand=B.filter(b=>dist(d,b)<=1600).map(b=>({b,...alongRoute(r.coords,b)})).filter(x=>x.d<=150&&x.total-x.s<=1500).sort((a,c)=>a.s-c.s);
+    pathInfo={key,stops:cand.slice(-routeN).map(x=>x.b)};render(true)})}
 // rota passando por 1, 2 ou 3 bolsões (Premium no futuro)
-let routeN=store.get('rotaN',1), routeOrd=store.get('rotaOrdem','longe');
+let routeN=store.get('rotaN',1), routeOrd=store.get('rotaOrdem','caminho');
 // escolhe os bolsões (o escolhido + os mais próximos dele) e define a ordem de visita
-function routeStops(){const first=current[picked].b, stops=[first], pool=current.filter((x,i)=>i!==picked).map(x=>x.b);
+function routeStops(){
+  if(routeN>1&&routeOrd==='caminho'&&pathInfo&&pathInfo.stops&&pathInfo.stops.length)return pathInfo.stops;
+  const first=current[picked].b, stops=[first], pool=current.filter((x,i)=>i!==picked).map(x=>x.b);
   while(stops.length<routeN&&pool.length){const last=stops[stops.length-1];pool.sort((a,c)=>dist(last,a)-dist(last,c));stops.push(pool.shift())}
-  if(routeOrd==='longe'&&stops.length>1){const rest=stops.slice(1).sort((a,c)=>dist(dest,c)-dist(dest,a));return [...rest,first]}
+  if(routeOrd!=='perto'&&stops.length>1){const rest=stops.slice(1).sort((a,c)=>dist(dest,c)-dist(dest,a));return [...rest,first]}
   return stops}
 function render(fit){
   layer.clearLayers();
   if(!dest||!current.length){showHome();return}
   const d=dest, c=current[picked], b=c.b;
-  addMarker(d.lng,d.lat,d.me?meHtml:destHtml,d.me?'center':'bottom',3);
+  if(!d.me)addMarker(d.lng,d.lat,destHtml,'bottom',3);showMe(false);
+  if(routeN>1&&routeOrd==='caminho'){if(!lastPos)askPos(()=>render());else computePath()}
+  const onPath=routeN>1&&routeOrd==='caminho'&&pathInfo&&pathInfo.stops&&pathInfo.stops.length>0;
+  const pathMsg=routeN>1&&routeOrd==='caminho'?(!lastPos?'Ative a localização para achar os bolsões no seu caminho.':!pathInfo||pathInfo.loading?'Calculando seu caminho…':pathInfo.fail?'Não consegui calcular o caminho agora; usando do longe ao perto.':!onPath?'Nenhum bolsão fica no seu caminho; mostrando do longe ao perto.':''):'';
   const stops=routeStops();
   current.forEach((x,i)=>{const o=stops.indexOf(x.b);addMarker(x.b.lng,x.b.lat,bHtml(x.b.vagas,i===picked,stops.length>1&&o>=0?o+1:0),'center',i===picked?3:o>=0?2:1,()=>{picked=i;render()})});
-  const sc=stops.map(s=>[s.lng,s.lat]);setLine(routeOrd==='longe'&&stops.length>1?[...sc,[d.lng,d.lat]]:[[d.lng,d.lat],...sc]);
+  // trecho a pé (tracejado) do bolsão mais perto até o destino; trecho de moto pelas ruas
+  const walkFrom=stops.reduce((a,s)=>dist(d,s)<dist(d,a)?s:a,stops[0]);
+  setLine(d.me?null:[[walkFrom.lng,walkFrom.lat],[d.lng,d.lat]]);
+  const drivePts=[...(lastPos&&!d.me?[lastPos]:[]),...stops];const token=Symbol();render.token=token;
+  if(drivePts.length>1)osrm(drivePts).then(r=>{if(render.token!==token)return;
+    setRoute(r?r.coords:drivePts.map(p=>[p.lng,p.lat]));
+    const el=$('rtinfo');if(el&&r)el.textContent=(lastPos&&!d.me?'De onde você está: ':'Entre os bolsões: ')+fmtM(r.dist)+' · ~'+Math.max(1,Math.round(r.dur/60))+' min de moto'});
   if(fit){const bb=new maplibregl.LngLatBounds([d.lng,d.lat],[d.lng,d.lat]);(stops.length>1?stops:current.slice(0,3).map(x=>x.b)).forEach(s=>bb.extend([s.lng,s.lat]));map.fitBounds(bb,{padding:{top:50,left:40,right:40,bottom:(mobile()?Math.min(sheet.offsetHeight,$('map').offsetHeight*.6):0)+40},maxZoom:17,duration:600})}
   const near=c.m<=400, far=c.m>900;
   const where=d.me?'Você está aqui':`Destino: <b>${esc(d.label)}</b>${d.sub?' · '+esc(d.sub):''}`;
@@ -293,14 +335,16 @@ function render(fit){
   ${far?`<p class="dest">Não há bolsão a até 900 m. Este é o mais perto que a CET lista.</p>`:''}
   <div class="rnrow"><p class="lbl">Passar por<span class="prem">PREMIUM</span></p></div>
   <div class="seg rn" role="group" aria-label="Quantos bolsões na rota">${[1,2,3].map(n=>`<button data-rn="${n}" aria-pressed="${routeN===n}">${n===1?'1 (direto)':n+' bolsões'}</button>`).join('')}</div>
-  ${stops.length>1?`<div class="seg rn" role="group" aria-label="Ordem da rota" style="grid-template-columns:1fr 1fr">
-    <button data-ord="longe" aria-pressed="${routeOrd==='longe'}">Do longe ao perto</button><button data-ord="perto" aria-pressed="${routeOrd==='perto'}">Mais perto primeiro</button></div>
-  <p class="dest" style="margin-top:-4px">Rota: ${stops.map((s,i)=>`<b>${i+1}</b> ${esc(s.rua)}`).join(' → ')}. ${routeOrd==='longe'?'Você vai se aproximando do destino; o último é o mais perto dele.':'Se houver vaga no 1º, é só encerrar a navegação.'}</p>`:''}
+  ${routeN>1?`<div class="seg rn" role="group" aria-label="Ordem da rota">
+    <button data-ord="caminho" aria-pressed="${routeOrd==='caminho'}">No meu caminho</button><button data-ord="longe" aria-pressed="${routeOrd==='longe'}">Do longe ao perto</button><button data-ord="perto" aria-pressed="${routeOrd==='perto'}">Perto primeiro</button></div>
+  ${pathMsg?`<p class="dest" style="margin-top:-4px">${pathMsg}</p>`:''}
+  <p class="dest" style="margin-top:-4px">Rota: ${stops.map((s,i)=>`<b>${i+1}</b> ${esc(s.rua)}`).join(' → ')}. ${routeOrd==='perto'?'Se houver vaga no 1º, é só encerrar a navegação.':onPath?'Todos ficam no trajeto que você já vai fazer.':'Você vai se aproximando do destino; o último é o mais perto dele.'}</p>`:''}
+  <p class="dest" id="rtinfo" style="margin-top:-4px"></p>
   <button class="go" id="goBtn"><svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M21.7 11.3 12.7 2.3a1 1 0 0 0-1.4 0l-9 9a1 1 0 0 0 0 1.4l9 9a1 1 0 0 0 1.4 0l9-9a1 1 0 0 0 0-1.4zM14 14.5V12h-4v3H8v-4a1 1 0 0 1 1-1h5V7.5l3.5 3.5z"/></svg>${stops.length>1?`Ir passando por ${stops.length} bolsões`:'Ir para o bolsão'}</button>
   <div class="alts"><p class="lbl" style="margin:4px 0 0">Outras opções</p>
   ${current.map((x,i)=>i===picked?'':`<button class="alt" data-alt="${i}"><span class="t">${esc(x.b.rua)}</span><span class="s">${fmtM(x.m)} · ${esc(x.b.area||x.b.comp||'')}</span><span class="n">${x.b.vagas} vagas</span></button>`).join('')}
   </div>
-  <p class="foot">Distâncias em linha reta. Confira a placa no local. Dados CET${DATA_DATE?' de '+DATA_DATE:''}.</p>`;
+  <p class="foot">Distância até o destino em linha reta; a rota azul segue as ruas e a mão de direção. Confira a placa no local. Dados CET${DATA_DATE?' de '+DATA_DATE:''}.</p>`;
 }
 
 // ---------- abrir no Google Maps ----------
@@ -354,14 +398,19 @@ function pick(s){sugg.hidden=true;q.blur();setDest(s)}
 document.addEventListener('click',e=>{if(!e.target.closest('.search'))sugg.hidden=true});
 $('clear').onclick=()=>{q.value='';$('clear').hidden=true;dest=null;current=[];layer.clearLayers();showHome();q.focus();setAllVisible(true);showMe(false)};
 // ponto azul de "você está aqui" na tela inicial (só se a localização já foi liberada antes)
-let meMarker=null, lastPos=null;
-function showMe(center){if(!lastPos||dest)return;if(meMarker)meMarker.remove();const el=document.createElement('div');el.innerHTML=meHtml;
+let meMarker=null, lastPos=null, watchId=null;
+function askPos(cb){if(!navigator.geolocation||askPos.busy)return;askPos.busy=true;navigator.geolocation.getCurrentPosition(p=>{askPos.busy=false;lastPos={lat:p.coords.latitude,lng:p.coords.longitude};showMe(false);follow();cb&&cb()},()=>{askPos.busy=false},{enableHighAccuracy:true,timeout:12000,maximumAge:30000})}
+function follow(){if(watchId!==null||!navigator.geolocation)return;watchId=navigator.geolocation.watchPosition(p=>{lastPos={lat:p.coords.latitude,lng:p.coords.longitude};if(meMarker)meMarker.setLngLat([lastPos.lng,lastPos.lat]);else showMe(false)},()=>{},{enableHighAccuracy:true,maximumAge:10000})}
+function showMe(center){if(!lastPos)return;if(meMarker)meMarker.remove();const el=document.createElement('div');el.innerHTML=meHtml;
   meMarker=new maplibregl.Marker({element:el}).setLngLat([lastPos.lng,lastPos.lat]).addTo(map);
   if(center)map.easeTo({center:[lastPos.lng,lastPos.lat],zoom:15,offset:[0,mobile()?-sheet.offsetHeight/2:0],duration:0})}
 function hideMe(){if(meMarker){meMarker.remove();meMarker=null}}
 if(navigator.permissions&&navigator.geolocation){navigator.permissions.query({name:'geolocation'}).then(s=>{if(s.state==='granted')
-  navigator.geolocation.getCurrentPosition(p=>{lastPos={lat:p.coords.latitude,lng:p.coords.longitude};showMe(true)},()=>{},{enableHighAccuracy:false,timeout:8000,maximumAge:120000})}).catch(()=>{})}
+  navigator.geolocation.getCurrentPosition(p=>{lastPos={lat:p.coords.latitude,lng:p.coords.longitude};showMe(true);follow()},()=>{},{enableHighAccuracy:false,timeout:8000,maximumAge:120000})}).catch(()=>{})}
 
+$('loc').onclick=()=>{const go2=()=>{showMe(false);$('loc').classList.add('on');map.easeTo({center:[lastPos.lng,lastPos.lat],zoom:Math.max(map.getZoom(),15),offset:[0,mobile()?-sheet.offsetHeight/2:0],duration:500})};
+  if(lastPos){go2();askPos()}else{toast('Buscando sua localização…');askPos(go2)}};
+map.on('dragstart',()=>$('loc').classList.remove('on'));
 // ---------- perto de mim ----------
 $('near').onclick=()=>{
   if(!navigator.geolocation){toast('Localização não disponível neste aparelho.');return}
@@ -400,11 +449,11 @@ function sizes(){const vh=innerHeight, hd=document.querySelector('header').offse
   const mid=hc?Math.min(Math.round(vh*.42),hc.offsetHeight+26+16+(parseFloat(getComputedStyle(sheet).paddingBottom)||0)):Math.round(vh*.46);
   return {min:110,mid,max:vh-hd-24}}
 let sheetState='mid';
-function setSheet(s){sheetState=s;if(!mobile()){sheet.style.height='';return}sheet.style.height=sizes()[s]+'px'}
+function setSheet(s){sheetState=s;if(!mobile()){sheet.style.height='';return}const hh=sizes()[s];sheet.style.height=hh+'px';document.documentElement.style.setProperty('--sh',hh+'px')}
 let drag=null;
 grab.addEventListener('pointerdown',e=>{if(!mobile())return;grab.setPointerCapture(e.pointerId);drag={y:e.clientY,h:sheet.offsetHeight,moved:0};sheet.classList.add('dragging')});
 grab.addEventListener('pointermove',e=>{if(!drag)return;const dy=drag.y-e.clientY;drag.moved=Math.max(drag.moved,Math.abs(dy));const z=sizes();
-  sheet.style.height=Math.max(z.min,Math.min(z.max,drag.h+dy))+'px'});
+  const hh=Math.max(z.min,Math.min(z.max,drag.h+dy));sheet.style.height=hh+'px';document.documentElement.style.setProperty('--sh',hh+'px')});
 function endDrag(){if(!drag)return;sheet.classList.remove('dragging');const z=sizes(),h=sheet.offsetHeight,moved=drag.moved;drag=null;
   if(moved<6){setSheet(sheetState==='max'?'mid':sheetState==='mid'?'max':'mid');return}
   const best=Object.entries(z).sort((a,b)=>Math.abs(a[1]-h)-Math.abs(b[1]-h))[0][0];setSheet(best)}
