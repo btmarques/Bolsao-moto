@@ -13,6 +13,7 @@
 <link rel="apple-touch-icon" href="icon-180.png">
 <link rel="icon" href="icon-192.png">
 <link rel="manifest" href="manifest.webmanifest">
+<script>try{var t=JSON.parse(localStorage.getItem('tema')||'""');if(t==='light'||t==='dark')document.documentElement.setAttribute('data-theme',t)}catch(e){}</script>
 <link rel="stylesheet" href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css">
 <style>
 :root{
@@ -23,10 +24,14 @@
   --display:-apple-system,"SF Pro Display",system-ui,"Segoe UI",Roboto,sans-serif;
   color-scheme:light;
 }
-@media (prefers-color-scheme:dark){:root{
+@media (prefers-color-scheme:dark){:root:not([data-theme=light]){
   --bg:#0c1016; --surface:#161c24; --fg:#eef2f6; --muted:#9aa5b2; --line:#29313c;
   --sign:#2f7bd6; --sign-2:#1d5aa6; --chip:#1f2732; --ok:#3cc477; --warn:#f0a43a; --pin:#ff4d5e; --hdr:#0f2744;
   color-scheme:dark}}
+:root[data-theme=dark]{
+  --bg:#0c1016; --surface:#161c24; --fg:#eef2f6; --muted:#9aa5b2; --line:#29313c;
+  --sign:#2f7bd6; --sign-2:#1d5aa6; --chip:#1f2732; --ok:#3cc477; --warn:#f0a43a; --pin:#ff4d5e; --hdr:#0f2744;
+  color-scheme:dark}
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 html,body{margin:0;height:100%}
 body{height:100dvh;position:relative;overflow:hidden}
@@ -36,10 +41,17 @@ button{font:inherit;color:inherit}
 
 /* topo */
 header{background:var(--hdr);color:var(--sign-fg);padding-top:calc(env(safe-area-inset-top) + 10px);padding-bottom:12px;flex:none;position:relative;z-index:1000}
-.brand{display:flex;align-items:center;gap:10px;margin-bottom:10px}
+.brand{display:flex;align-items:center;gap:8px;margin-bottom:10px}
 .brand img{width:30px;height:30px;border-radius:8px}
-.brand b{font-family:var(--display);font-size:20px;font-weight:800;letter-spacing:-.01em;flex:1}
-#near{border:0;background:rgba(255,255,255,.16);color:#fff;font-weight:700;font-size:15px;padding:8px 12px;border-radius:999px;display:flex;align-items:center;gap:6px}
+.brand b{font-family:var(--display);font-size:18px;font-weight:800;letter-spacing:-.01em;flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#cfg{flex:none;width:36px;height:36px;border:0;border-radius:50%;background:rgba(255,255,255,.16);color:#fff;display:grid;place-items:center;padding:0}
+#cfg svg{width:26px;height:26px}
+#cfg:active{background:rgba(255,255,255,.3)}
+.seg{display:grid;grid-template-columns:repeat(3,1fr);gap:4px;background:var(--chip);border:1px solid var(--line);border-radius:12px;padding:4px}
+.seg button{border:0;background:none;border-radius:9px;padding:10px 6px;font-weight:700;font-size:15px;color:var(--muted)}
+.seg button[aria-pressed=true]{background:var(--surface);color:var(--fg);box-shadow:0 1px 4px rgba(0,0,0,.15)}
+.cfgsec{margin:14px 0 4px}
+#near{flex:none;border:0;background:rgba(255,255,255,.16);color:#fff;font-weight:700;font-size:15px;padding:8px 11px;border-radius:999px;display:flex;align-items:center;gap:6px}
 #near:active{background:rgba(255,255,255,.3)}
 .search{position:relative}
 #q{width:100%;font:inherit;font-size:18px;padding:14px 44px 14px 16px;border-radius:14px;border:0;background:var(--surface);color:var(--fg);box-shadow:0 2px 10px rgba(0,0,0,.18);-webkit-appearance:none}
@@ -111,7 +123,7 @@ button:focus-visible{outline:3px solid var(--mark);outline-offset:2px}
 </head>
 <body>
 <header class="pad">
-  <div class="brand"><img src="icon-180.png" alt=""><b>Bolsão Moto</b><button id="near" aria-label="Bolsões perto de mim"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M21 3 3 10.5l7 2.5 2.5 7z"/></svg>Perto de mim</button></div>
+  <div class="brand"><img src="icon-180.png" alt=""><b>Bolsão Moto</b><button id="cfg" aria-label="Configurações"><svg aria-hidden="true" viewBox="0 0 48 48"><circle cx="24" cy="24" r="17.5" fill="none" stroke="currentColor" stroke-width="5"/><rect x="21.7" y="1.8" width="4.6" height="3.4" rx="0.8" fill="currentColor" transform="rotate(0.0 24 24)"/><rect x="21.7" y="1.8" width="4.6" height="3.4" rx="0.8" fill="currentColor" transform="rotate(25.714285714285715 24 24)"/><rect x="21.7" y="1.8" width="4.6" height="3.4" rx="0.8" fill="currentColor" transform="rotate(51.42857142857143 24 24)"/><rect x="21.7" y="1.8" width="4.6" height="3.4" rx="0.8" fill="currentColor" transform="rotate(77.14285714285714 24 24)"/><rect x="21.7" y="1.8" width="4.6" height="3.4" rx="0.8" fill="currentColor" transform="rotate(102.85714285714286 24 24)"/><rect x="21.7" y="1.8" width="4.6" height="3.4" rx="0.8" fill="currentColor" transform="rotate(128.57142857142858 24 24)"/><rect x="21.7" y="1.8" width="4.6" height="3.4" rx="0.8" fill="currentColor" transform="rotate(154.28571428571428 24 24)"/><rect x="21.7" y="1.8" width="4.6" height="3.4" rx="0.8" fill="currentColor" transform="rotate(180.0 24 24)"/><rect x="21.7" y="1.8" width="4.6" height="3.4" rx="0.8" fill="currentColor" transform="rotate(205.71428571428572 24 24)"/><rect x="21.7" y="1.8" width="4.6" height="3.4" rx="0.8" fill="currentColor" transform="rotate(231.42857142857144 24 24)"/><rect x="21.7" y="1.8" width="4.6" height="3.4" rx="0.8" fill="currentColor" transform="rotate(257.14285714285717 24 24)"/><rect x="21.7" y="1.8" width="4.6" height="3.4" rx="0.8" fill="currentColor" transform="rotate(282.8571428571429 24 24)"/><rect x="21.7" y="1.8" width="4.6" height="3.4" rx="0.8" fill="currentColor" transform="rotate(308.57142857142856 24 24)"/><rect x="21.7" y="1.8" width="4.6" height="3.4" rx="0.8" fill="currentColor" transform="rotate(334.2857142857143 24 24)"/><circle cx="24" cy="24" r="12.6" fill="none" stroke="currentColor" stroke-width="1.6"/><line x1="27.20" y1="24.00" x2="35.84" y2="26.95" stroke="currentColor" stroke-width="0.9" stroke-linecap="round"/><line x1="26.77" y1="25.60" x2="32.78" y2="32.47" stroke="currentColor" stroke-width="0.9" stroke-linecap="round"/><line x1="25.60" y1="26.77" x2="27.36" y2="35.73" stroke="currentColor" stroke-width="0.9" stroke-linecap="round"/><line x1="24.00" y1="27.20" x2="21.05" y2="35.84" stroke="currentColor" stroke-width="0.9" stroke-linecap="round"/><line x1="22.40" y1="26.77" x2="15.53" y2="32.78" stroke="currentColor" stroke-width="0.9" stroke-linecap="round"/><line x1="21.23" y1="25.60" x2="12.27" y2="27.36" stroke="currentColor" stroke-width="0.9" stroke-linecap="round"/><line x1="20.80" y1="24.00" x2="12.16" y2="21.05" stroke="currentColor" stroke-width="0.9" stroke-linecap="round"/><line x1="21.23" y1="22.40" x2="15.22" y2="15.53" stroke="currentColor" stroke-width="0.9" stroke-linecap="round"/><line x1="22.40" y1="21.23" x2="20.64" y2="12.27" stroke="currentColor" stroke-width="0.9" stroke-linecap="round"/><line x1="24.00" y1="20.80" x2="26.95" y2="12.16" stroke="currentColor" stroke-width="0.9" stroke-linecap="round"/><line x1="25.60" y1="21.23" x2="32.47" y2="15.22" stroke="currentColor" stroke-width="0.9" stroke-linecap="round"/><line x1="26.77" y1="22.40" x2="35.73" y2="20.64" stroke="currentColor" stroke-width="0.9" stroke-linecap="round"/><circle cx="24" cy="24" r="3.6" fill="currentColor"/><circle cx="24" cy="24" r="1.4" fill="var(--hdr)"/></svg></button><button id="near" aria-label="Bolsões perto de mim"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M21 3 3 10.5l7 2.5 2.5 7z"/></svg>Perto de mim</button></div>
   <div class="search">
     <input id="q" type="search" enterkeyhint="search" autocomplete="off" autocorrect="off" placeholder="Para onde você vai?" aria-label="Destino">
     <button id="clear" aria-label="Limpar" hidden>×</button>
@@ -150,7 +162,9 @@ const walkMin=m=>Math.max(1,Math.round(m*1.3/80)); // fator de trajeto real ≈1
 
 // ---------- mapa ----------
 const dark=matchMedia('(prefers-color-scheme: dark)');
-const styleUrl=()=>'https://tiles.openfreemap.org/styles/'+(dark.matches?'dark':'positron');
+const tema=()=>document.documentElement.getAttribute('data-theme')||'auto';
+const isDark=()=>tema()==='dark'||(tema()==='auto'&&dark.matches);
+const styleUrl=()=>'https://tiles.openfreemap.org/styles/'+(isDark()?'dark':'positron');
 const map=new maplibregl.Map({container:'map',style:styleUrl(),center:[-46.6333,-23.5505],zoom:13,attributionControl:{compact:true},pitchWithRotate:false,dragRotate:false});
 map.touchZoomRotate.disableRotation();
 // marcadores do resultado (elementos HTML, sobrevivem à troca de estilo)
@@ -178,7 +192,8 @@ map.on('style.load',addDataLayers);
 map.on('click','todos',e=>{const f=e.features&&e.features[0];if(f){const [lng,lat]=f.geometry.coordinates;setDest({lat,lng,label:f.properties.rua,sub:f.properties.area||''},false)}});
 map.on('mouseenter','todos',()=>map.getCanvas().style.cursor='pointer');
 map.on('mouseleave','todos',()=>map.getCanvas().style.cursor='');
-dark.addEventListener('change',()=>map.setStyle(styleUrl()));
+dark.addEventListener('change',()=>{if(tema()==='auto')map.setStyle(styleUrl(),{diff:false})});
+function setTema(t){store.set('tema',t);if(t==='auto')document.documentElement.removeAttribute('data-theme');else document.documentElement.setAttribute('data-theme',t);map.setStyle(styleUrl(),{diff:false})}
 
 // pontos de fundo quando não há destino
 function drawAll(){allData={type:'FeatureCollection',features:B.map(b=>({type:'Feature',geometry:{type:'Point',coordinates:[b.lng,b.lat]},properties:{rua:b.rua,area:b.area||''}}))};
@@ -201,6 +216,18 @@ function showHome(){
   <p class="foot">${B.length?B.length.toLocaleString('pt-BR')+' bolsões gratuitos da CET':'Carregando bolsões…'}${DATA_DATE?' · dados de '+DATA_DATE:''}</p></div>`;
   if(typeof setSheet==='function')setSheet('mid');
 }
+function showSettings(){
+  const t=tema();const b=(v,l)=>`<button data-tema="${v}" aria-pressed="${t===v}">${l}</button>`;
+  panel.innerHTML=`<div id="homec"><button class="back" id="backHome">‹ Voltar</button>
+  <div class="empty"><h2>Configurações</h2></div>
+  <p class="lbl cfgsec">Aparência</p>
+  <div class="seg" role="group" aria-label="Aparência">${b('auto','Automático')}${b('light','Claro')}${b('dark','Escuro')}</div>
+  <p class="foot">Automático segue o modo claro ou escuro do celular.</p>
+  <p class="lbl cfgsec" style="margin-top:18px">Dados</p>
+  <p class="foot" style="margin-top:0">${B.length.toLocaleString('pt-BR')} bolsões gratuitos da CET${DATA_DATE?' · atualizados em '+DATA_DATE:''}.</p></div>`;
+  if(typeof setSheet==='function')setSheet('mid');
+}
+$('cfg').onclick=()=>{if(dest){$('q').value='';$('clear').hidden=true;dest=null;current=[];layer.clearLayers();setAllVisible(true);showMe(false)}showSettings()};
 function showFavs(){
   const f=store.get('favoritos',[]);
   panel.innerHTML=`<div id="homec"><button class="back" id="backHome">‹ Voltar</button>
@@ -213,6 +240,7 @@ panel.addEventListener('click',e=>{
   const r=e.target.closest('[data-r]');if(r){const d=store.get('recentes',[])[+r.dataset.r];if(d)setDest(d);return}
   const fv=e.target.closest('[data-f]');if(fv){const d=store.get('favoritos',[])[+fv.dataset.f];if(d)setDest(d);return}
   if(e.target.closest('#favBtn')){showFavs();return}
+  const tb=e.target.closest('[data-tema]');if(tb){setTema(tb.dataset.tema);showSettings();return}
   if(e.target.closest('#backHome')){showHome();return}
   const a=e.target.closest('[data-alt]');if(a){picked=+a.dataset.alt;render();return}
   if(e.target.closest('#goBtn')){go(current[picked].b);return}
