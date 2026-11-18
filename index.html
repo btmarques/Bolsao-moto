@@ -158,7 +158,7 @@ button:focus-visible{outline:3px solid var(--mark);outline-offset:2px}
 <script>
 (function(){
 'use strict';
-const APP_VERSION='17/11 · 24h00';
+const APP_VERSION='18/11 · 00h10';
 const $=id=>document.getElementById(id);
 const norm=s=>(s||'').normalize('NFD').replace(/[̀-ͯ]/g,'').toLowerCase();
 const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
@@ -182,7 +182,8 @@ const dark=matchMedia('(prefers-color-scheme: dark)');
 const tema=()=>document.documentElement.getAttribute('data-theme')||'auto';
 const isDark=()=>tema()==='dark'||(tema()==='auto'&&dark.matches);
 const styleUrl=()=>'https://tiles.openfreemap.org/styles/'+(isDark()?'dark':'positron');
-const map=new maplibregl.Map({container:'map',style:styleUrl(),center:[-46.6333,-23.5505],zoom:13,attributionControl:{compact:true},pitchWithRotate:false,dragRotate:false});
+const savedPos=store.get('ultimaPos',null);
+const map=new maplibregl.Map({container:'map',style:styleUrl(),center:savedPos?[savedPos.lng,savedPos.lat]:[-46.6333,-23.5505],zoom:savedPos?17:15,attributionControl:{compact:true},pitchWithRotate:false,dragRotate:false});
 map.touchZoomRotate.disableRotation();
 // marcadores do resultado (elementos HTML, sobrevivem à troca de estilo)
 let markers=[];
@@ -244,6 +245,9 @@ function showSettings(){
   <p class="lbl cfgsec">Aparência</p>
   <div class="seg" role="group" aria-label="Aparência">${b('auto','Automático')}${b('light','Claro')}${b('dark','Escuro')}</div>
   <p class="foot">Automático segue o modo claro ou escuro do celular.</p>
+  <p class="lbl cfgsec" style="margin-top:18px">App de navegação<span class="prem">PREMIUM</span></p>
+  <div class="seg" role="group" aria-label="App de navegação" style="grid-template-columns:1fr 1fr"><button data-nav="google" aria-pressed="${navApp==='google'}">Google Maps</button><button data-nav="waze" aria-pressed="${navApp==='waze'}">Waze</button></div>
+  <p class="foot">${navApp==='waze'?'O Waze já abre navegando, mas só leva a 1 bolsão; com 2 ou 3 bolsões o app usa o Google Maps. Para o modo moto, no Waze vá em Configurações > Tipo de veículo > Moto.':'O Google Maps abre no modo moto e aceita rotas com 2 ou 3 bolsões. No iPhone, toque em Iniciar para começar.'}</p>
   <p class="lbl cfgsec" style="margin-top:18px">Dados</p>
   <p class="foot" style="margin-top:0">${B.length.toLocaleString('pt-BR')} bolsões gratuitos da CET${DATA_DATE?' · atualizados em '+DATA_DATE:''}.</p>
   <p class="foot" style="margin-top:18px">Versão do app: ${APP_VERSION}</p></div>`;
@@ -262,6 +266,7 @@ panel.addEventListener('click',e=>{
   const r=e.target.closest('[data-r]');if(r){const d=store.get('recentes',[])[+r.dataset.r];if(d)setDest(d);return}
   const fv=e.target.closest('[data-f]');if(fv){const d=store.get('favoritos',[])[+fv.dataset.f];if(d)setDest(d);return}
   if(e.target.closest('#favBtn')){showFavs();return}
+  const nb=e.target.closest('[data-nav]');if(nb){navApp=nb.dataset.nav;store.set('navApp',navApp);showSettings();return}
   const tb=e.target.closest('[data-tema]');if(tb){setTema(tb.dataset.tema);showSettings();return}
   if(e.target.closest('#backHome')){showHome();return}
   const a=e.target.closest('[data-alt]');if(a){picked=+a.dataset.alt;render();return}
@@ -301,7 +306,7 @@ function computePath(){
     const cand=B.filter(b=>dist(d,b)<=1600).map(b=>({b,...alongRoute(r.coords,b)})).filter(x=>x.d<=150&&x.total-x.s<=1500).sort((a,c)=>a.s-c.s);
     pathInfo={key,stops:cand.slice(-routeN).map(x=>x.b)};render(true)})}
 // rota passando por 1, 2 ou 3 bolsões (Premium no futuro)
-let routeN=store.get('rotaN',1), routeOrd=store.get('rotaOrdem','caminho');
+let navApp=store.get('navApp','google'), routeN=store.get('rotaN',1), routeOrd=store.get('rotaOrdem','caminho');
 // escolhe os bolsões (o escolhido + os mais próximos dele) e define a ordem de visita
 function routeStops(){
   if(routeN>1&&routeOrd==='caminho'&&pathInfo&&pathInfo.stops&&pathInfo.stops.length)return pathInfo.stops;
@@ -358,6 +363,11 @@ function render(fit){
 // ---------- abrir no Google Maps ----------
 function go(b){
   const ll=b.lat+','+b.lng;
+  if(navApp==='waze'){const wweb='https://waze.com/ul?ll='+ll+'&navigate=yes';
+    if(/iPhone|iPad|iPod/.test(navigator.userAgent)||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1)){let gone=false;document.addEventListener('visibilitychange',()=>{gone=true},{once:true});
+      location.href='waze://?ll='+ll+'&navigate=yes';setTimeout(()=>{if(!gone&&!document.hidden)location.href=wweb},1400)}
+    else location.href=wweb;
+    return}
   const web='https://www.google.com/maps/dir/?api=1&destination='+ll+'&travelmode=two-wheeler&dir_action=navigate';
   const app='comgooglemaps://?daddr='+ll+'&directionsmode=two-wheeler&nav=1';
   const isIOS=/iPhone|iPad|iPod/.test(navigator.userAgent)||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1);
@@ -424,7 +434,7 @@ function askPos(cb){if(!navigator.geolocation||askPos.busy)return;askPos.busy=tr
 function follow(){if(watchId!==null||!navigator.geolocation)return;watchId=navigator.geolocation.watchPosition(p=>{const np={lat:p.coords.latitude,lng:p.coords.longitude};
   if(p.coords.heading!=null&&!isNaN(p.coords.heading)&&(p.coords.speed||0)>1)lastHeading=p.coords.heading;else if(lastPos&&dist(lastPos,np)>8)lastHeading=bearing(lastPos,np);
   lastPos=np;if(meMarker){meMarker.setLngLat([np.lng,np.lat]);meMarker.setRotation(lastHeading)}else showMe(false)},()=>{},{enableHighAccuracy:true,maximumAge:10000})}
-function showMe(center){if(!lastPos)return;if(meMarker)meMarker.remove();const el=document.createElement('div');el.innerHTML=meHtml;
+function showMe(center){if(!lastPos)return;store.set('ultimaPos',{lat:+lastPos.lat.toFixed(5),lng:+lastPos.lng.toFixed(5)});if(meMarker)meMarker.remove();const el=document.createElement('div');el.innerHTML=meHtml;
   meMarker=new maplibregl.Marker({element:el,rotationAlignment:'map',pitchAlignment:'map'}).setLngLat([lastPos.lng,lastPos.lat]).setRotation(lastHeading||0).addTo(map);
   if(center)map.easeTo({center:[lastPos.lng,lastPos.lat],zoom:17,offset:[0,mobile()?-sheet.offsetHeight/2:0],duration:0})}
 function hideMe(){if(meMarker){meMarker.remove();meMarker=null}}
