@@ -158,7 +158,7 @@ button:focus-visible{outline:3px solid var(--mark);outline-offset:2px}
 <script>
 (function(){
 'use strict';
-const APP_VERSION='18/11 · 00h10';
+const APP_VERSION='18/11 · 00h15';
 const $=id=>document.getElementById(id);
 const norm=s=>(s||'').normalize('NFD').replace(/[̀-ͯ]/g,'').toLowerCase();
 const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
@@ -438,7 +438,8 @@ function showMe(center){if(!lastPos)return;store.set('ultimaPos',{lat:+lastPos.l
   meMarker=new maplibregl.Marker({element:el,rotationAlignment:'map',pitchAlignment:'map'}).setLngLat([lastPos.lng,lastPos.lat]).setRotation(lastHeading||0).addTo(map);
   if(center)map.easeTo({center:[lastPos.lng,lastPos.lat],zoom:17,offset:[0,mobile()?-sheet.offsetHeight/2:0],duration:0})}
 function hideMe(){if(meMarker){meMarker.remove();meMarker=null}}
-if(navigator.permissions&&navigator.geolocation){navigator.permissions.query({name:'geolocation'}).then(s=>{if(s.state==='granted')
+if(navigator.geolocation&&store.get('ultimaPos',null)&&!(navigator.permissions)){navigator.geolocation.getCurrentPosition(p=>{lastPos={lat:p.coords.latitude,lng:p.coords.longitude};showMe(true);follow()},()=>{},{enableHighAccuracy:true,timeout:10000,maximumAge:60000})}
+if(navigator.permissions&&navigator.geolocation){navigator.permissions.query({name:'geolocation'}).then(s=>{if(s.state==='granted'||(s.state==='prompt'&&store.get('ultimaPos',null)))
   navigator.geolocation.getCurrentPosition(p=>{lastPos={lat:p.coords.latitude,lng:p.coords.longitude};showMe(true);follow()},()=>{},{enableHighAccuracy:false,timeout:8000,maximumAge:120000})}).catch(()=>{})}
 
 $('loc').onclick=()=>{const go2=()=>{showMe(false);$('loc').classList.add('on');map.easeTo({center:[lastPos.lng,lastPos.lat],zoom:17,offset:[0,mobile()?-sheet.offsetHeight/2:0],duration:500})};
