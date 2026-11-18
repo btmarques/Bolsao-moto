@@ -34,6 +34,7 @@
   color-scheme:dark}
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 html,body{margin:0;height:100%}
+html{background:var(--surface)}
 body{height:100%;position:relative;overflow:hidden}
 body{background:var(--bg);color:var(--fg);font-family:var(--font);font-size:17px;line-height:1.4;display:block;overscroll-behavior:none}
 button{font:inherit;color:inherit}
@@ -157,7 +158,7 @@ button:focus-visible{outline:3px solid var(--mark);outline-offset:2px}
 <script>
 (function(){
 'use strict';
-const APP_VERSION='18/11 · 00h45';
+const APP_VERSION='18/11 · 00h50';
 const $=id=>document.getElementById(id);
 const norm=s=>(s||'').normalize('NFD').replace(/[̀-ͯ]/g,'').toLowerCase();
 const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
@@ -218,7 +219,7 @@ function addDataLayers(){
   if(!map.getLayer('rota'))map.addLayer({id:'rota',type:'line',source:'rota',layout:{'line-cap':'round','line-join':'round'},paint:{'line-color':'#1a73e8','line-width':5}});
   if(!map.getSource('linha'))map.addSource('linha',{type:'geojson',data:lineData||empty});
   if(!map.hasImage('passos'))map.addImage('passos',footprints(),{pixelRatio:2});
-  if(!map.getLayer('linha'))map.addLayer({id:'linha',type:'symbol',source:'linha',layout:{'symbol-placement':'line','symbol-spacing':80,'icon-image':'passos','icon-size':1.55,'icon-rotation-alignment':'map','icon-keep-upright':false,'icon-allow-overlap':true,'icon-ignore-placement':true}});
+  if(!map.getLayer('linha'))map.addLayer({id:'linha',type:'symbol',source:'linha',layout:{'symbol-placement':'line','symbol-spacing':30,'icon-image':'passos','icon-size':0.78,'icon-rotation-alignment':'map','icon-keep-upright':false,'icon-allow-overlap':true,'icon-ignore-placement':true}});
 }
 map.on('style.load',addDataLayers);
 map.on('click','todos',e=>{const f=e.features&&e.features[0];if(f){const [lng,lat]=f.geometry.coordinates;setDest({lat,lng,label:f.properties.rua,sub:f.properties.area||''},false)}});
