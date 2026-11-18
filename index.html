@@ -71,6 +71,13 @@ header{background:var(--hdr);color:var(--sign-fg);padding-top:calc(env(safe-area
 .dest-pin{width:30px;height:40px}
 .me-dot{width:18px;height:18px;border-radius:50%;background:#1a73e8;border:3px solid #fff;box-shadow:0 0 0 6px rgba(26,115,232,.25)}
 .bmk{display:grid;place-items:center;border-radius:50%;background:var(--mark);color:var(--mark-fg);font-weight:800;font-size:12px;border:2px solid #1b1600;box-shadow:0 1px 4px rgba(0,0,0,.35)}
+.bmk{position:relative}
+.bmk .ord{position:absolute;top:-7px;left:-7px;width:18px;height:18px;border-radius:50%;background:var(--sign);color:#fff;font-size:11px;font-weight:800;display:grid;place-items:center;border:2px solid #fff}
+.bmk.rt{background:var(--ok);color:#fff;border-color:#fff}
+.rnrow{display:flex;align-items:center;justify-content:space-between;margin:2px 0 6px}
+.rnrow .lbl{margin:0}
+.prem{font-size:10px;font-weight:800;letter-spacing:.06em;background:var(--mark);color:var(--mark-fg);border-radius:6px;padding:2px 6px;margin-left:6px;vertical-align:1px}
+.seg.rn{margin-bottom:12px}
 .bmk.best{background:var(--ok);color:#fff;border-color:#fff;font-size:14px;box-shadow:0 0 0 4px rgba(23,138,69,.35),0 2px 6px rgba(0,0,0,.4)}
 
 /* painel */
@@ -175,7 +182,7 @@ function addMarker(lng,lat,html,anchor,z,onClick){const el=document.createElemen
   const m=new maplibregl.Marker({element:el,anchor:anchor||'center'}).setLngLat([lng,lat]).addTo(map);markers.push(m);return m}
 const destHtml='<svg class="dest-pin" viewBox="0 0 30 40"><path d="M15 39C15 39 2 23 2 14a13 13 0 0 1 26 0c0 9-13 25-13 25z" fill="#d0142c" stroke="#fff" stroke-width="2"/><circle cx="15" cy="14" r="5" fill="#fff"/></svg>';
 const meHtml='<div class="me-dot"></div>';
-const bHtml=(n,best)=>{const s=best?40:Math.min(30,18+Math.round(n/5));return `<div class="bmk${best?' best':''}" style="width:${s}px;height:${s}px">${n}</div>`};
+const bHtml=(n,best,ord)=>{const s=best?40:ord?32:Math.min(30,18+Math.round(n/5));return `<div class="bmk${best?' best':ord?' rt':''}" style="width:${s}px;height:${s}px">${n}${ord?`<i class="ord">${ord}</i>`:''}</div>`};
 // camadas de dados no mapa (refeitas sempre que o estilo carrega)
 let lineData=null, allData={type:'FeatureCollection',features:[]}, allVisible=true;
 const empty={type:'FeatureCollection',features:[]};
@@ -243,7 +250,8 @@ panel.addEventListener('click',e=>{
   const tb=e.target.closest('[data-tema]');if(tb){setTema(tb.dataset.tema);showSettings();return}
   if(e.target.closest('#backHome')){showHome();return}
   const a=e.target.closest('[data-alt]');if(a){picked=+a.dataset.alt;render();return}
-  if(e.target.closest('#goBtn')){go(current[picked].b);return}
+  const rb=e.target.closest('[data-rn]');if(rb){routeN=+rb.dataset.rn;store.set('rotaN',routeN);render(true);return}
+  if(e.target.closest('#goBtn')){const st=routeStops();if(st.length>1)goRoute(st);else go(st[0]);return}
 });
 
 function setDest(d,save=true){
@@ -253,14 +261,20 @@ function setDest(d,save=true){
   current=B.map(b=>({b,m:dist(d,b)})).sort((x,y)=>x.m-y.m).slice(0,6);
   picked=0;if(sheetState==='min')setSheet('mid');render(true);
 }
+// rota passando por 1, 2 ou 3 bolsões (Premium no futuro)
+let routeN=store.get('rotaN',1);
+function routeStops(){const first=current[picked].b, stops=[first], pool=current.filter((x,i)=>i!==picked).map(x=>x.b);
+  while(stops.length<routeN&&pool.length){const last=stops[stops.length-1];pool.sort((a,c)=>dist(last,a)-dist(last,c));stops.push(pool.shift())}
+  return stops}
 function render(fit){
   layer.clearLayers();
   if(!dest||!current.length){showHome();return}
   const d=dest, c=current[picked], b=c.b;
   addMarker(d.lng,d.lat,d.me?meHtml:destHtml,d.me?'center':'bottom',3);
-  current.forEach((x,i)=>addMarker(x.b.lng,x.b.lat,bHtml(x.b.vagas,i===picked),'center',i===picked?2:1,()=>{picked=i;render()}));
-  setLine([[d.lng,d.lat],[b.lng,b.lat]]);
-  if(fit){const bb=new maplibregl.LngLatBounds([d.lng,d.lat],[d.lng,d.lat]);current.slice(0,3).forEach(x=>bb.extend([x.b.lng,x.b.lat]));map.fitBounds(bb,{padding:{top:50,left:40,right:40,bottom:(mobile()?Math.min(sheet.offsetHeight,$('map').offsetHeight*.6):0)+40},maxZoom:17,duration:600})}
+  const stops=routeStops();
+  current.forEach((x,i)=>{const o=stops.indexOf(x.b);addMarker(x.b.lng,x.b.lat,bHtml(x.b.vagas,i===picked,stops.length>1&&o>=0?o+1:0),'center',i===picked?3:o>=0?2:1,()=>{picked=i;render()})});
+  setLine([[d.lng,d.lat],...stops.map(s=>[s.lng,s.lat])]);
+  if(fit){const bb=new maplibregl.LngLatBounds([d.lng,d.lat],[d.lng,d.lat]);(stops.length>1?stops:current.slice(0,3).map(x=>x.b)).forEach(s=>bb.extend([s.lng,s.lat]));map.fitBounds(bb,{padding:{top:50,left:40,right:40,bottom:(mobile()?Math.min(sheet.offsetHeight,$('map').offsetHeight*.6):0)+40},maxZoom:17,duration:600})}
   const near=c.m<=400, far=c.m>900;
   const where=d.me?'Você está aqui':`Destino: <b>${esc(d.label)}</b>${d.sub?' · '+esc(d.sub):''}`;
   panel.innerHTML=`
@@ -274,7 +288,10 @@ function render(fit){
     ${b.aprox?'<span class="pill warn">posição aproximada</span>':''}
   </div>
   ${far?`<p class="dest">Não há bolsão a até 900 m. Este é o mais perto que a CET lista.</p>`:''}
-  <button class="go" id="goBtn"><svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M21.7 11.3 12.7 2.3a1 1 0 0 0-1.4 0l-9 9a1 1 0 0 0 0 1.4l9 9a1 1 0 0 0 1.4 0l9-9a1 1 0 0 0 0-1.4zM14 14.5V12h-4v3H8v-4a1 1 0 0 1 1-1h5V7.5l3.5 3.5z"/></svg>Ir para o bolsão</button>
+  <div class="rnrow"><p class="lbl">Passar por<span class="prem">PREMIUM</span></p></div>
+  <div class="seg rn" role="group" aria-label="Quantos bolsões na rota">${[1,2,3].map(n=>`<button data-rn="${n}" aria-pressed="${routeN===n}">${n===1?'1 (direto)':n+' bolsões'}</button>`).join('')}</div>
+  ${stops.length>1?`<p class="dest" style="margin-top:-4px">Rota: ${stops.map((s,i)=>`<b>${i+1}</b> ${esc(s.rua)}`).join(' → ')}. Se houver vaga no 1º, é só encerrar a navegação.</p>`:''}
+  <button class="go" id="goBtn"><svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M21.7 11.3 12.7 2.3a1 1 0 0 0-1.4 0l-9 9a1 1 0 0 0 0 1.4l9 9a1 1 0 0 0 1.4 0l9-9a1 1 0 0 0 0-1.4zM14 14.5V12h-4v3H8v-4a1 1 0 0 1 1-1h5V7.5l3.5 3.5z"/></svg>${stops.length>1?`Ir passando por ${stops.length} bolsões`:'Ir para o bolsão'}</button>
   <div class="alts"><p class="lbl" style="margin:4px 0 0">Outras opções</p>
   ${current.map((x,i)=>i===picked?'':`<button class="alt" data-alt="${i}"><span class="t">${esc(x.b.rua)}</span><span class="s">${fmtM(x.m)} · ${esc(x.b.area||x.b.comp||'')}</span><span class="n">${x.b.vagas} vagas</span></button>`).join('')}
   </div>
@@ -292,6 +309,12 @@ function go(b){
   document.addEventListener('visibilitychange',onHide,{once:true});
   location.href=app;
   setTimeout(()=>{if(!left&&!document.hidden)location.href=web},1400);
+}
+
+// várias paradas: só o Google Maps aceita; o link universal abre o app se estiver instalado
+function goRoute(stops){
+  const ll=s=>s.lat+','+s.lng, last=stops[stops.length-1];
+  location.href='https://www.google.com/maps/dir/?api=1&destination='+ll(last)+'&waypoints='+encodeURIComponent(stops.slice(0,-1).map(ll).join('|'))+'&travelmode=driving&dir_action=navigate';
 }
 
 // ---------- busca de endereço (Photon / OpenStreetMap) ----------
