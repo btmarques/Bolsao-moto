@@ -158,6 +158,7 @@ button:focus-visible{outline:3px solid var(--mark);outline-offset:2px}
 <script>
 (function(){
 'use strict';
+const APP_VERSION='17/11 · 24h00';
 const $=id=>document.getElementById(id);
 const norm=s=>(s||'').normalize('NFD').replace(/[̀-ͯ]/g,'').toLowerCase();
 const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
@@ -244,7 +245,8 @@ function showSettings(){
   <div class="seg" role="group" aria-label="Aparência">${b('auto','Automático')}${b('light','Claro')}${b('dark','Escuro')}</div>
   <p class="foot">Automático segue o modo claro ou escuro do celular.</p>
   <p class="lbl cfgsec" style="margin-top:18px">Dados</p>
-  <p class="foot" style="margin-top:0">${B.length.toLocaleString('pt-BR')} bolsões gratuitos da CET${DATA_DATE?' · atualizados em '+DATA_DATE:''}.</p></div>`;
+  <p class="foot" style="margin-top:0">${B.length.toLocaleString('pt-BR')} bolsões gratuitos da CET${DATA_DATE?' · atualizados em '+DATA_DATE:''}.</p>
+  <p class="foot" style="margin-top:18px">Versão do app: ${APP_VERSION}</p></div>`;
   if(typeof setSheet==='function')setSheet('mid');
 }
 $('cfg').onclick=()=>{if(dest){$('q').value='';$('clear').hidden=true;dest=null;current=[];layer.clearLayers();setAllVisible(true);showMe(false)}showSettings()};
@@ -356,9 +358,13 @@ function render(fit){
 // ---------- abrir no Google Maps ----------
 function go(b){
   const ll=b.lat+','+b.lng;
-  const web='https://www.google.com/maps/dir/?api=1&destination='+ll+'&travelmode=driving&dir_action=navigate';
-  const app='comgooglemaps://?daddr='+ll+'&directionsmode=driving';
+  const web='https://www.google.com/maps/dir/?api=1&destination='+ll+'&travelmode=two-wheeler&dir_action=navigate';
+  const app='comgooglemaps://?daddr='+ll+'&directionsmode=two-wheeler&nav=1';
   const isIOS=/iPhone|iPad|iPod/.test(navigator.userAgent)||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1);
+  const isAndroid=/Android/i.test(navigator.userAgent);
+  if(isAndroid){let gone=false;document.addEventListener('visibilitychange',()=>{gone=true},{once:true});
+    location.href='intent://navigation?q='+ll+'&mode=l#Intent;scheme=google.navigation;package=com.google.android.apps.maps;S.browser_fallback_url='+encodeURIComponent(web)+';end';
+    setTimeout(()=>{if(!gone&&!document.hidden)location.href=web},1600);return}
   if(!isIOS){location.href=web;return}
   let left=false;const onHide=()=>{left=true};
   document.addEventListener('visibilitychange',onHide,{once:true});
@@ -369,9 +375,9 @@ function go(b){
 // várias paradas: só o Google Maps aceita; o link universal abre o app se estiver instalado
 function goRoute(stops){
   const ll=s=>s.lat+','+s.lng, last=stops[stops.length-1];
-  const web='https://www.google.com/maps/dir/?api=1&destination='+ll(last)+'&waypoints='+encodeURIComponent(stops.slice(0,-1).map(ll).join('|'))+'&travelmode=driving&dir_action=navigate';
+  const web='https://www.google.com/maps/dir/?api=1&destination='+ll(last)+'&waypoints='+encodeURIComponent(stops.slice(0,-1).map(ll).join('|'))+'&travelmode=two-wheeler&dir_action=navigate';
   // no iPhone, abre direto o app do Google Maps com as paradas (formato "A+to:B+to:C"); o site fica de reserva
-  const app='comgooglemaps://?daddr='+stops.map(ll).join('+to:')+'&directionsmode=driving';
+  const app='comgooglemaps://?daddr='+stops.map(ll).join('+to:')+'&directionsmode=two-wheeler&nav=1';
   const isIOS=/iPhone|iPad|iPod/.test(navigator.userAgent)||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1);
   if(!isIOS){location.href=web;return}
   let left=false;document.addEventListener('visibilitychange',()=>{left=true},{once:true});
