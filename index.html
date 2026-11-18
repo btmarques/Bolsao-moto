@@ -263,7 +263,7 @@ function setDest(d,save=true){
   picked=0;if(sheetState==='min')setSheet('mid');render(true);
 }
 // rota passando por 1, 2 ou 3 bolsões (Premium no futuro)
-let routeN=store.get('rotaN',1), routeOrd=store.get('rotaOrdem','perto');
+let routeN=store.get('rotaN',1), routeOrd=store.get('rotaOrdem','longe');
 // escolhe os bolsões (o escolhido + os mais próximos dele) e define a ordem de visita
 function routeStops(){const first=current[picked].b, stops=[first], pool=current.filter((x,i)=>i!==picked).map(x=>x.b);
   while(stops.length<routeN&&pool.length){const last=stops[stops.length-1];pool.sort((a,c)=>dist(last,a)-dist(last,c));stops.push(pool.shift())}
@@ -294,7 +294,7 @@ function render(fit){
   <div class="rnrow"><p class="lbl">Passar por<span class="prem">PREMIUM</span></p></div>
   <div class="seg rn" role="group" aria-label="Quantos bolsões na rota">${[1,2,3].map(n=>`<button data-rn="${n}" aria-pressed="${routeN===n}">${n===1?'1 (direto)':n+' bolsões'}</button>`).join('')}</div>
   ${stops.length>1?`<div class="seg rn" role="group" aria-label="Ordem da rota" style="grid-template-columns:1fr 1fr">
-    <button data-ord="perto" aria-pressed="${routeOrd==='perto'}">Mais perto primeiro</button><button data-ord="longe" aria-pressed="${routeOrd==='longe'}">Do longe ao perto</button></div>
+    <button data-ord="longe" aria-pressed="${routeOrd==='longe'}">Do longe ao perto</button><button data-ord="perto" aria-pressed="${routeOrd==='perto'}">Mais perto primeiro</button></div>
   <p class="dest" style="margin-top:-4px">Rota: ${stops.map((s,i)=>`<b>${i+1}</b> ${esc(s.rua)}`).join(' → ')}. ${routeOrd==='longe'?'Você vai se aproximando do destino; o último é o mais perto dele.':'Se houver vaga no 1º, é só encerrar a navegação.'}</p>`:''}
   <button class="go" id="goBtn"><svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M21.7 11.3 12.7 2.3a1 1 0 0 0-1.4 0l-9 9a1 1 0 0 0 0 1.4l9 9a1 1 0 0 0 1.4 0l9-9a1 1 0 0 0 0-1.4zM14 14.5V12h-4v3H8v-4a1 1 0 0 1 1-1h5V7.5l3.5 3.5z"/></svg>${stops.length>1?`Ir passando por ${stops.length} bolsões`:'Ir para o bolsão'}</button>
   <div class="alts"><p class="lbl" style="margin:4px 0 0">Outras opções</p>
