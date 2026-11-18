@@ -92,10 +92,11 @@ header{background:var(--hdr);color:var(--sign-fg);padding-top:calc(env(safe-area
 .chips{display:flex;flex-wrap:wrap;gap:8px}
 .chip{border:1px solid var(--line);background:var(--chip);border-radius:999px;padding:8px 12px;font-size:15px;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .foot{margin-top:14px;font-size:12px;color:var(--muted)}
-.favbtn{display:flex;align-items:center;gap:10px;width:100%;border:1px solid var(--line);background:var(--chip);border-radius:14px;padding:12px 14px;font-weight:700;font-size:16px;text-align:left}
+.rowhd{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:14px 0 8px}
+.rowhd .lbl{margin:0}
+.favbtn{display:flex;align-items:center;gap:6px;border:1px solid var(--line);background:var(--chip);border-radius:999px;padding:7px 12px;font-weight:700;font-size:14px}
 .favbtn svg{flex:none;color:var(--mark)}
-.favbtn span{flex:1}
-.favbtn small{font-weight:600;color:var(--muted);font-size:14px}
+.favbtn small{font-weight:600;color:var(--muted);font-size:13px}
 .back{border:0;background:none;color:var(--sign);font-weight:700;padding:0;margin:0 0 10px;font-size:15px}
 .toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(env(safe-area-inset-bottom) + 20px);background:var(--fg);color:var(--bg);padding:10px 16px;border-radius:12px;font-size:15px;z-index:2000;max-width:calc(100% - 32px);text-align:center}
 button:focus-visible{outline:3px solid var(--mark);outline-offset:2px}
@@ -187,14 +188,15 @@ function drawAll(){allData={type:'FeatureCollection',features:B.map(b=>({type:'F
 const panel=$('panel');
 function recentChips(){
   const r=store.get('recentes',[]).slice(0,3);
-  return r.length?`<p class="lbl" style="margin-top:14px">Recentes</p><div class="chips">${r.map((d,i)=>`<button class="chip" data-r="${i}">${esc(d.label)}</button>`).join('')}</div>`:'';
+  return r.length?`<div class="chips">${r.map((d,i)=>`<button class="chip" data-r="${i}">${esc(d.label)}</button>`).join('')}</div>`
+    :'<p class="foot" style="margin-top:0">Os destinos que você buscar aparecem aqui.</p>';
 }
-const starSvg='<svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2.5l2.9 6.1 6.6.8-4.9 4.6 1.3 6.6L12 17.3l-5.9 3.3 1.3-6.6L2.5 9.4l6.6-.8z"/></svg>';
+const starSvg='<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2.5l2.9 6.1 6.6.8-4.9 4.6 1.3 6.6L12 17.3l-5.9 3.3 1.3-6.6L2.5 9.4l6.6-.8z"/></svg>';
 function showHome(){
   const nf=store.get('favoritos',[]).length;
   panel.innerHTML=`<div id="homec"><div class="empty"><h2>Para onde você vai?</h2>
   <p>Digite o destino acima ou toque em <b>Perto de mim</b>.</p></div>
-  <button class="favbtn" id="favBtn">${starSvg}<span>Favoritos</span><small>${nf?nf+' salvo'+(nf>1?'s':''):'nenhum ainda'}</small></button>
+  <div class="rowhd"><p class="lbl">Recentes</p><button class="favbtn" id="favBtn">${starSvg}Favoritos${nf?` <small>${nf}</small>`:''}</button></div>
   ${recentChips()}
   <p class="foot">${B.length?B.length.toLocaleString('pt-BR')+' bolsões gratuitos da CET':'Carregando bolsões…'}${DATA_DATE?' · dados de '+DATA_DATE:''}</p></div>`;
   if(typeof setSheet==='function')setSheet('mid');
