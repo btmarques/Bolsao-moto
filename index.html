@@ -157,7 +157,7 @@ button:focus-visible{outline:3px solid var(--mark);outline-offset:2px}
 <script>
 (function(){
 'use strict';
-const APP_VERSION='18/11 · 00h40';
+const APP_VERSION='18/11 · 00h45';
 const $=id=>document.getElementById(id);
 const norm=s=>(s||'').normalize('NFD').replace(/[̀-ͯ]/g,'').toLowerCase();
 const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
@@ -255,6 +255,9 @@ function showSettings(){
   <p class="lbl cfgsec">Aparência</p>
   <div class="seg" role="group" aria-label="Aparência">${b('auto','Automático')}${b('light','Claro')}${b('dark','Escuro')}</div>
   <p class="foot">Automático segue o modo claro ou escuro do celular.</p>
+  <p class="lbl cfgsec" style="margin-top:18px">Rota por vários bolsões<span class="prem">PREMIUM</span></p>
+  <div class="seg" role="group" aria-label="Rota por vários bolsões" style="grid-template-columns:1fr 1fr"><button data-multi="0" aria-pressed="${!multiOn}">Desligado</button><button data-multi="1" aria-pressed="${multiOn}">Ligado</button></div>
+  <p class="foot">${multiOn?'No resultado aparece a opção de passar por 1, 2 ou 3 bolsões e a ordem da rota, para garantir a vaga.':'O app leva direto ao bolsão escolhido. Ligue para passar por 2 ou 3 bolsões na mesma rota.'}</p>
   <p class="lbl cfgsec" style="margin-top:18px">App de navegação<span class="prem">PREMIUM</span></p>
   <div class="seg" role="group" aria-label="App de navegação" style="grid-template-columns:1fr 1fr"><button data-nav="google" aria-pressed="${navApp==='google'}">Google Maps</button><button data-nav="waze" aria-pressed="${navApp==='waze'}">Waze</button></div>
   <p class="foot">${navApp==='waze'?'O Waze já abre navegando, mas só leva a 1 bolsão; com 2 ou 3 bolsões o app usa o Google Maps. Para o modo moto, no Waze vá em Configurações > Tipo de veículo > Moto.':'O Google Maps abre no modo moto e aceita rotas com 2 ou 3 bolsões. No iPhone, toque em Iniciar para começar.'}</p>
@@ -276,6 +279,7 @@ panel.addEventListener('click',e=>{
   const r=e.target.closest('[data-r]');if(r){const d=store.get('recentes',[])[+r.dataset.r];if(d)setDest(d);return}
   const fv=e.target.closest('[data-f]');if(fv){const d=store.get('favoritos',[])[+fv.dataset.f];if(d)setDest(d);return}
   if(e.target.closest('#favBtn')){showFavs();return}
+  const mb=e.target.closest('[data-multi]');if(mb){multiOn=mb.dataset.multi==='1';store.set('multiOn',multiOn);pathInfo=null;showSettings();return}
   const nb=e.target.closest('[data-nav]');if(nb){navApp=nb.dataset.nav;store.set('navApp',navApp);showSettings();return}
   const tb=e.target.closest('[data-tema]');if(tb){setTema(tb.dataset.tema);showSettings();return}
   if(e.target.closest('#backHome')){showHome();return}
@@ -314,19 +318,20 @@ function alongRoute(coords,pt){const kx=111320*Math.cos(pt.lat*Math.PI/180),ky=1
 // "no meu caminho": bolsões a até 150 m da rota, no último 1,5 km antes do destino, na ordem em que você passa
 let pathInfo=null;
 function computePath(){
-  if(!dest||!lastPos)return;const d=dest,key=d.lat+','+d.lng+'|'+lastPos.lat.toFixed(4)+','+lastPos.lng.toFixed(4)+'|'+routeN;
+  if(!dest||!lastPos)return;const d=dest,key=d.lat+','+d.lng+'|'+lastPos.lat.toFixed(4)+','+lastPos.lng.toFixed(4)+'|'+rN();
   if(pathInfo&&pathInfo.key===key)return;pathInfo={key,loading:true};
   osrm([lastPos,d]).then(r=>{if(!pathInfo||pathInfo.key!==key)return;
     if(!r){pathInfo={key,fail:true};render();return}
     const cand=B.filter(b=>dist(d,b)<=1600).map(b=>({b,...alongRoute(r.coords,b)})).filter(x=>x.d<=150&&x.total-x.s<=1500).sort((a,c)=>a.s-c.s);
-    pathInfo={key,stops:cand.slice(-routeN).map(x=>x.b)};render(true)})}
-// rota passando por 1, 2 ou 3 bolsões (Premium no futuro)
-let navApp=store.get('navApp','google'), routeN=store.get('rotaN',1), routeOrd=store.get('rotaOrdem','caminho');
+    pathInfo={key,stops:cand.slice(-rN()).map(x=>x.b)};render(true)})}
+// rota passando por 1, 2 ou 3 bolsões (Premium; ligada em Configurações)
+const rN=()=>multiOn?routeN:1;
+let multiOn=store.get('multiOn',false), navApp=store.get('navApp','google'), routeN=store.get('rotaN',2), routeOrd=store.get('rotaOrdem','caminho');
 // escolhe os bolsões (o escolhido + os mais próximos dele) e define a ordem de visita
 function routeStops(){
-  if(routeN>1&&routeOrd==='caminho'&&pathInfo&&pathInfo.stops&&pathInfo.stops.length)return pathInfo.stops;
+  if(rN()>1&&routeOrd==='caminho'&&pathInfo&&pathInfo.stops&&pathInfo.stops.length)return pathInfo.stops;
   const first=current[picked].b, stops=[first], pool=current.filter((x,i)=>i!==picked).map(x=>x.b);
-  while(stops.length<routeN&&pool.length){const last=stops[stops.length-1];pool.sort((a,c)=>dist(last,a)-dist(last,c));stops.push(pool.shift())}
+  while(stops.length<rN()&&pool.length){const last=stops[stops.length-1];pool.sort((a,c)=>dist(last,a)-dist(last,c));stops.push(pool.shift())}
   if(routeOrd!=='perto'&&stops.length>1){const rest=stops.slice(1).sort((a,c)=>dist(dest,c)-dist(dest,a));return [...rest,first]}
   return stops}
 function render(fit){
@@ -334,9 +339,9 @@ function render(fit){
   if(!dest||!current.length){showHome();return}
   const d=dest, c=current[picked], b=c.b;
   if(!d.me)addMarker(d.lng,d.lat,destHtml,'bottom',3);showMe(false);
-  if(routeN>1&&routeOrd==='caminho'){if(!lastPos)askPos(()=>render());else computePath()}
-  const onPath=routeN>1&&routeOrd==='caminho'&&pathInfo&&pathInfo.stops&&pathInfo.stops.length>0;
-  const pathMsg=routeN>1&&routeOrd==='caminho'?(!lastPos?'Ative a localização para achar os bolsões no seu caminho.':!pathInfo||pathInfo.loading?'Calculando seu caminho…':pathInfo.fail?'Não consegui calcular o caminho agora; usando do longe ao perto.':!onPath?'Nenhum bolsão fica no seu caminho; mostrando do longe ao perto.':''):'';
+  if(rN()>1&&routeOrd==='caminho'){if(!lastPos)askPos(()=>render());else computePath()}
+  const onPath=rN()>1&&routeOrd==='caminho'&&pathInfo&&pathInfo.stops&&pathInfo.stops.length>0;
+  const pathMsg=rN()>1&&routeOrd==='caminho'?(!lastPos?'Ative a localização para achar os bolsões no seu caminho.':!pathInfo||pathInfo.loading?'Calculando seu caminho…':pathInfo.fail?'Não consegui calcular o caminho agora; usando do longe ao perto.':!onPath?'Nenhum bolsão fica no seu caminho; mostrando do longe ao perto.':''):'';
   const stops=routeStops();
   current.forEach((x,i)=>{const o=stops.indexOf(x.b);addMarker(x.b.lng,x.b.lat,bHtml(x.b.vagas,i===picked,stops.length>1&&o>=0?o+1:0),'center',i===picked?3:o>=0?2:1,()=>{picked=i;render()})});
   // trecho a pé (tracejado) do bolsão mais perto até o destino; trecho de moto pelas ruas
@@ -364,9 +369,9 @@ function render(fit){
     ${b.aprox?'<span class="pill warn">posição aproximada</span>':''}
   </div>
   ${far?`<p class="dest">Não há bolsão a até 900 m. Este é o mais perto que a CET lista.</p>`:''}
-  <div class="rnrow"><p class="lbl">Passar por<span class="prem">PREMIUM</span></p></div>
-  <div class="seg rn" role="group" aria-label="Quantos bolsões na rota">${[1,2,3].map(n=>`<button data-rn="${n}" aria-pressed="${routeN===n}">${n===1?'1 (direto)':n+' bolsões'}</button>`).join('')}</div>
-  ${routeN>1?`<div class="seg rn" role="group" aria-label="Ordem da rota">
+  ${multiOn?`<div class="rnrow"><p class="lbl">Passar por<span class="prem">PREMIUM</span></p></div>
+  <div class="seg rn" role="group" aria-label="Quantos bolsões na rota">${[1,2,3].map(n=>`<button data-rn="${n}" aria-pressed="${routeN===n}">${n===1?'1 (direto)':n+' bolsões'}</button>`).join('')}</div>`:''}
+  ${rN()>1?`<div class="seg rn" role="group" aria-label="Ordem da rota">
     <button data-ord="caminho" aria-pressed="${routeOrd==='caminho'}">No meu caminho</button><button data-ord="longe" aria-pressed="${routeOrd==='longe'}">Do longe ao perto</button><button data-ord="perto" aria-pressed="${routeOrd==='perto'}">Perto primeiro</button></div>
   ${pathMsg?`<p class="dest" style="margin-top:-4px">${pathMsg}</p>`:''}
   <p class="dest" style="margin-top:-4px">Rota: ${stops.map((s,i)=>`<b>${i+1}</b> ${esc(s.rua)}`).join(' → ')}. ${routeOrd==='perto'?'Se houver vaga no 1º, é só encerrar a navegação.':onPath?'Todos ficam no trajeto que você já vai fazer.':'Você vai se aproximando do destino; o último é o mais perto dele.'}</p>`:''}
