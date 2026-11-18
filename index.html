@@ -157,7 +157,7 @@ button:focus-visible{outline:3px solid var(--mark);outline-offset:2px}
 <script>
 (function(){
 'use strict';
-const APP_VERSION='18/11 · 00h30';
+const APP_VERSION='18/11 · 00h40';
 const $=id=>document.getElementById(id);
 const norm=s=>(s||'').normalize('NFD').replace(/[̀-ͯ]/g,'').toLowerCase();
 const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
@@ -196,6 +196,16 @@ const bHtml=(n,best,ord)=>{const s=best?40:ord?32:Math.min(30,18+Math.round(n/5)
 // camadas de dados no mapa (refeitas sempre que o estilo carrega)
 let lineData=null, routeData=null, allData={type:'FeatureCollection',features:[]}, allVisible=true;
 const empty={type:'FeatureCollection',features:[]};
+// par de pegadas apontando para a direita (+x): o MapLibre alinha o x com a direção do caminho
+function footprints(){const W=96,H=64,c=document.createElement('canvas');c.width=W;c.height=H;const g=c.getContext('2d');
+  // um pé apontando para +x: frente larga, arco estreito, calcanhar separado (como pegada de sapato)
+  const sole=(x,y,flip)=>{g.save();g.translate(x,y);g.scale(1,flip?-1:1);
+    g.beginPath();g.ellipse(9,-0.8,13,6.4,-0.08,0,Math.PI*2);g.fill();g.stroke();   // sola (frente alongada)
+    g.beginPath();g.ellipse(-11.5,0.6,6,5.2,0,0,Math.PI*2);g.fill();g.stroke();    // salto
+    g.restore()};
+  g.fillStyle='#22b05a';g.strokeStyle='#ffffff';g.lineWidth=2.2;g.lineJoin='round';
+  sole(30,20,false);sole(70,44,true);
+  return g.getImageData(0,0,W,H)}
 function setRoute(coords){routeData=coords&&coords.length>1?{type:'Feature',geometry:{type:'LineString',coordinates:coords}}:null;const s=map.getSource('rota');if(s)s.setData(routeData||empty)}
 function setLine(coords){lineData=coords?{type:'Feature',geometry:{type:'LineString',coordinates:coords}}:null;const s=map.getSource('linha');if(s)s.setData(lineData||empty)}
 function setAllVisible(v){allVisible=v;if(map.getLayer('todos'))map.setLayoutProperty('todos','visibility',v?'visible':'none')}
@@ -207,7 +217,8 @@ function addDataLayers(){
   if(!map.getLayer('rota-borda'))map.addLayer({id:'rota-borda',type:'line',source:'rota',layout:{'line-cap':'round','line-join':'round'},paint:{'line-color':'#ffffff','line-width':8,'line-opacity':.9}});
   if(!map.getLayer('rota'))map.addLayer({id:'rota',type:'line',source:'rota',layout:{'line-cap':'round','line-join':'round'},paint:{'line-color':'#1a73e8','line-width':5}});
   if(!map.getSource('linha'))map.addSource('linha',{type:'geojson',data:lineData||empty});
-  if(!map.getLayer('linha'))map.addLayer({id:'linha',type:'line',source:'linha',layout:{'line-cap':'round'},paint:{'line-color':'#178a45','line-width':3,'line-dasharray':[1.5,2]}});
+  if(!map.hasImage('passos'))map.addImage('passos',footprints(),{pixelRatio:2});
+  if(!map.getLayer('linha'))map.addLayer({id:'linha',type:'symbol',source:'linha',layout:{'symbol-placement':'line','symbol-spacing':80,'icon-image':'passos','icon-size':1.55,'icon-rotation-alignment':'map','icon-keep-upright':false,'icon-allow-overlap':true,'icon-ignore-placement':true}});
 }
 map.on('style.load',addDataLayers);
 map.on('click','todos',e=>{const f=e.features&&e.features[0];if(f){const [lng,lat]=f.geometry.coordinates;setDest({lat,lng,label:f.properties.rua,sub:f.properties.area||''},false)}});
@@ -283,6 +294,11 @@ function setDest(d,save=true){
 }
 // ---------- rotas pelas ruas (OSRM / OpenStreetMap: respeita mão de direção) ----------
 const routeCache=new Map();
+function osrmFoot(a,b){const key='foot:'+[a,b].map(p=>p.lng.toFixed(5)+','+p.lat.toFixed(5)).join(';');
+  if(routeCache.has(key))return routeCache.get(key);
+  const pr=fetch('https://routing.openstreetmap.de/routed-foot/route/v1/driving/'+key.slice(5)+'?overview=full&geometries=geojson')
+    .then(r=>r.json()).then(j=>j.code==='Ok'&&j.routes[0]?j.routes[0].geometry.coordinates:null).catch(()=>null);
+  routeCache.set(key,pr);pr.then(v=>{if(!v)routeCache.delete(key)});return pr}
 function osrm(points){const key=points.map(p=>p.lng.toFixed(5)+','+p.lat.toFixed(5)).join(';');
   if(routeCache.has(key))return routeCache.get(key);
   const pr=fetch('https://router.project-osrm.org/route/v1/driving/'+key+'?overview=full&geometries=geojson')
@@ -326,6 +342,9 @@ function render(fit){
   // trecho a pé (tracejado) do bolsão mais perto até o destino; trecho de moto pelas ruas
   const walkFrom=stops.reduce((a,s)=>dist(d,s)<dist(d,a)?s:a,stops[0]);
   setLine(d.me?null:[[walkFrom.lng,walkFrom.lat],[d.lng,d.lat]]);
+  if(!d.me){const wt=Symbol();render.walk=wt;osrmFoot(walkFrom,d).then(c=>{if(render.walk!==wt||!c)return;
+    // garante que começa no bolsão e termina no destino
+    setLine([[walkFrom.lng,walkFrom.lat],...c,[d.lng,d.lat]])})}
   const drivePts=[...(lastPos&&!d.me?[lastPos]:[]),...stops];const token=Symbol();render.token=token;
   if(drivePts.length>1)osrm(drivePts).then(r=>{if(render.token!==token)return;
     setRoute(r?r.coords:drivePts.map(p=>[p.lng,p.lat]));
