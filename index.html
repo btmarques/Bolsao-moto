@@ -158,7 +158,7 @@ button:focus-visible{outline:3px solid var(--mark);outline-offset:2px}
 <script>
 (function(){
 'use strict';
-const APP_VERSION='18/11 · 01h00';
+const APP_VERSION='18/11 · 01h10';
 const $=id=>document.getElementById(id);
 const norm=s=>(s||'').normalize('NFD').replace(/[̀-ͯ]/g,'').toLowerCase();
 const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
@@ -510,7 +510,7 @@ function geocodeFora(fora){
 // ---------- painel arrastável ----------
 const sheet=$('sheet'), grab=$('grab');
 const mobile=()=>innerWidth<760;
-function sizes(){const vh=innerHeight+GAP(), hd=document.querySelector('header').offsetHeight, hc=$('homec');
+function sizes(){const vh=fullH(), hd=document.querySelector('header').offsetHeight, hc=$('homec');
   const mid=hc?Math.min(Math.round(vh*.42),hc.offsetHeight+26+16+(parseFloat(getComputedStyle(sheet).paddingBottom)||0)):Math.round(vh*.46);
   return {min:110,mid,max:vh-hd-24}}
 let sheetState='mid';
@@ -526,10 +526,13 @@ grab.addEventListener('pointerup',endDrag);grab.addEventListener('pointercancel'
 grab.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();setSheet(sheetState==='max'?'mid':'max')}});
 // no app da tela de início, alguns iPhones informam uma altura menor que a tela real; mede a diferença
 function GAP(){const sa=matchMedia('(display-mode: standalone)').matches||navigator.standalone;if(!sa||!mobile())return 0;
-  const portrait=innerHeight>innerWidth, real=portrait?Math.max(screen.height,screen.width):Math.min(screen.height,screen.width), g=real-innerHeight;
+  // mede onde o iOS realmente encerra o "fundo" dos elementos fixos e compara com a altura real da tela
+  let pr=document.getElementById('probe');if(!pr){pr=document.createElement('div');pr.id='probe';pr.style.cssText='position:fixed;left:0;bottom:0;width:1px;height:1px;pointer-events:none;visibility:hidden';document.body.appendChild(pr)}
+  const bot=pr.getBoundingClientRect().bottom, portrait=innerHeight>innerWidth, real=portrait?Math.max(screen.height,screen.width):Math.min(screen.height,screen.width), g=Math.round(real-bot);
   return g>0&&g<140?g:0}
+function fullH(){const pr=document.getElementById('probe');return (pr?pr.getBoundingClientRect().bottom:innerHeight)+GAP()}
 function setHd(){document.documentElement.style.setProperty('--gap',GAP()+'px');document.documentElement.style.setProperty('--hd',document.querySelector('header').offsetHeight+'px');map.resize()}
-addEventListener('resize',()=>{setHd();setSheet(sheetState)});setHd();
+addEventListener('resize',()=>{setHd();setSheet(sheetState)});setHd();setTimeout(()=>{setHd();setSheet(sheetState)},600);
 setSheet('mid');
 
 // ---------- carregar ----------
