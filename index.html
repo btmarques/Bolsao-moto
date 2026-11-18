@@ -324,7 +324,8 @@ function render(fit){
   if(drivePts.length>1)osrm(drivePts).then(r=>{if(render.token!==token)return;
     setRoute(r?r.coords:drivePts.map(p=>[p.lng,p.lat]));
     const el=$('rtinfo');if(el&&r)el.textContent=(lastPos&&!d.me?'De onde você está: ':'Entre os bolsões: ')+fmtM(r.dist)+' · ~'+Math.max(1,Math.round(r.dur/60))+' min de moto'});
-  if(fit){const bb=new maplibregl.LngLatBounds([d.lng,d.lat],[d.lng,d.lat]);(stops.length>1?stops:current.slice(0,3).map(x=>x.b)).forEach(s=>bb.extend([s.lng,s.lat]));map.fitBounds(bb,{padding:{top:50,left:40,right:40,bottom:(mobile()?Math.min(sheet.offsetHeight,$('map').offsetHeight*.6):0)+40},maxZoom:17,duration:600})}
+  // zoom fixo 17 (≈400 m de rua na tela), centrado entre o destino e o bolsão mais perto, acima do painel
+  if(fit)map.easeTo({center:[(d.lng+walkFrom.lng)/2,(d.lat+walkFrom.lat)/2],zoom:17,offset:[0,mobile()?-Math.min(sheet.offsetHeight,$('map').offsetHeight*.6)/2:0],duration:600});
   const near=c.m<=400, far=c.m>900;
   const where=d.me?'Você está aqui':`Destino: <b>${esc(d.label)}</b>${d.sub?' · '+esc(d.sub):''}`;
   panel.innerHTML=`
@@ -419,12 +420,12 @@ function follow(){if(watchId!==null||!navigator.geolocation)return;watchId=navig
   lastPos=np;if(meMarker){meMarker.setLngLat([np.lng,np.lat]);meMarker.setRotation(lastHeading)}else showMe(false)},()=>{},{enableHighAccuracy:true,maximumAge:10000})}
 function showMe(center){if(!lastPos)return;if(meMarker)meMarker.remove();const el=document.createElement('div');el.innerHTML=meHtml;
   meMarker=new maplibregl.Marker({element:el,rotationAlignment:'map',pitchAlignment:'map'}).setLngLat([lastPos.lng,lastPos.lat]).setRotation(lastHeading||0).addTo(map);
-  if(center)map.easeTo({center:[lastPos.lng,lastPos.lat],zoom:15,offset:[0,mobile()?-sheet.offsetHeight/2:0],duration:0})}
+  if(center)map.easeTo({center:[lastPos.lng,lastPos.lat],zoom:17,offset:[0,mobile()?-sheet.offsetHeight/2:0],duration:0})}
 function hideMe(){if(meMarker){meMarker.remove();meMarker=null}}
 if(navigator.permissions&&navigator.geolocation){navigator.permissions.query({name:'geolocation'}).then(s=>{if(s.state==='granted')
   navigator.geolocation.getCurrentPosition(p=>{lastPos={lat:p.coords.latitude,lng:p.coords.longitude};showMe(true);follow()},()=>{},{enableHighAccuracy:false,timeout:8000,maximumAge:120000})}).catch(()=>{})}
 
-$('loc').onclick=()=>{const go2=()=>{showMe(false);$('loc').classList.add('on');map.easeTo({center:[lastPos.lng,lastPos.lat],zoom:Math.max(map.getZoom(),15),offset:[0,mobile()?-sheet.offsetHeight/2:0],duration:500})};
+$('loc').onclick=()=>{const go2=()=>{showMe(false);$('loc').classList.add('on');map.easeTo({center:[lastPos.lng,lastPos.lat],zoom:17,offset:[0,mobile()?-sheet.offsetHeight/2:0],duration:500})};
   if(lastPos){go2();askPos()}else{toast('Buscando sua localização…');askPos(go2)}};
 map.on('dragstart',()=>$('loc').classList.remove('on'));
 // ---------- perto de mim ----------
